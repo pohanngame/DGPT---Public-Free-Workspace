@@ -27,12 +27,17 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
   return {
     async login(username, password) {
       const loginUrl = `${casBase()}/authserver/login`
-      const opened = await send(cookies, loginUrl, { timeoutMs })
-      const html = opened.status === 200 ? await opened.text() : await finishRedirect(cookies, opened, loginUrl, timeoutMs)
-      const form = findLoginForm(html)
-      if (!form) throw new Error('login form with pwdEncryptSalt not found')
-      const salt = matchValue(form, /id=["']pwdEncryptSalt["'][^>]*value=["']([^"']+)["']/i)
-      if (!salt) throw new Error('pwdEncryptSalt missing')
+      let page = await openLoginPage(cookies, loginUrl, timeoutMs)
+      if (!findLoginForm(page.html)) {
+        cookies.splice(0, cookies.length)
+        page = await openLoginPage(cookies, loginUrl, timeoutMs)
+      }
+      const form = findLoginForm(page.html)
+      if (!form) {
+        logBadLoginPage(page.status, page.html)
+        throw new Error('教务统一认证页面未正常返回（可能需要重新过验证或校园网 IP 限制），请重试')
+      }
+      const salt = findSalt(form)
       const inputs = hiddenInputs(form)
 
       const checkUrl = `${casBase()}/authserver/checkNeedCaptcha.htl?username=${encodeURIComponent(username)}`
@@ -46,7 +51,7 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
 
       const body = new URLSearchParams({
         username,
-        password: encryptPassword(password, salt),
+        password: salt ? encryptPassword(password, salt) : password,
         lt: inputs.lt ?? '',
         execution: inputs.execution ?? '',
         _eventId: 'submit',
@@ -306,9 +311,48 @@ function cookieHeader(cookies: StoredCookie[], url: string): string {
 
 function findLoginForm(html: string): string | null {
   for (const form of html.matchAll(/<form\b[^>]*>([\s\S]*?)<\/form>/gi)) {
-    if (/id=["']pwdEncryptSalt["']/i.test(form[1] ?? '')) return form[1] ?? null
+    const body = form[1] ?? ''
+    if (findSalt(body) || /type=["']password["']/i.test(body) || /name=["']execution["']/i.test(body)) return body
   }
   return null
+}
+
+function findSalt(form: string): string | null {
+  const named = form.match(/<(?:input|textarea)\b[^>]*(?:\bid|\bname)=["']pwdEncryptSalt["'][^>]*>/i)
+  const fromNamed = named ? attrValue(named[0]) : null
+  if (fromNamed) return fromNamed
+  for (const input of form.matchAll(/<input\b[^>]*>/gi)) {
+    const tag = input[0]
+    if (!/type=["']hidden["']/i.test(tag)) continue
+    const name = tag.match(/\bname=["']([^"']*)["']/i)?.[1] ?? ''
+    const id = tag.match(/\bid=["']([^"']*)["']/i)?.[1] ?? ''
+    if (!/salt/i.test(`${name} ${id}`)) continue
+    const value = attrValue(tag)
+    if (value) return value
+  }
+  return null
+}
+
+function attrValue(tag: string): string | null {
+  return tag.match(/\bvalue=["']([^"']*)["']/i)?.[1] ?? null
+}
+
+async function openLoginPage(
+  cookies: StoredCookie[],
+  loginUrl: string,
+  timeoutMs: number,
+): Promise<{ status: number; html: string }> {
+  const opened = await send(cookies, loginUrl, { timeoutMs })
+  if (opened.status === 200) return { status: opened.status, html: await opened.text() }
+  if (!isRedirect(opened.status)) return { status: opened.status, html: await opened.text() }
+  const html = await finishRedirect(cookies, opened, loginUrl, timeoutMs)
+  return { status: 200, html }
+}
+
+function logBadLoginPage(status: number, html: string): void {
+  const title = html.match(/<title>([^<]*)/i)?.[1]?.trim() || 'untitled'
+  const preview = html.replace(/\s+/g, ' ').slice(0, 300)
+  console.error(`login page missing pwdEncryptSalt status=${status} title=${title} html=${preview}`)
 }
 
 function hiddenInputs(form: string): Record<string, string> {
@@ -318,10 +362,6 @@ function hiddenInputs(form: string): Record<string, string> {
     if (name && inputs[name] === undefined) inputs[name] = match[2] ?? ''
   }
   return inputs
-}
-
-function matchValue(text: string, pattern: RegExp): string | null {
-  return text.match(pattern)?.[1] ?? null
 }
 
 function scriptRedirect(html: string): string | null {

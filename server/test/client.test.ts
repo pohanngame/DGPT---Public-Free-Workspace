@@ -326,6 +326,164 @@ test('http://example.com throws before any request', async () => {
   }
 })
 
+const NO_FORM = '<html><title>bad page</title><p>not a login</p></html>'
+const LOGIN_PAGE_ERROR = '教务统一认证页面未正常返回（可能需要重新过验证或校园网 IP 限制），请重试'
+
+test('login retries a salt-less page once and posts the second form', async () => {
+  let loginGets = 0
+  const cookies: (string | undefined)[] = []
+  const seen: { path: string; body: string }[] = []
+  const cas = await listen(async (req, res, url) => {
+    if (url.pathname === '/authserver/login' && req.method === 'GET') {
+      loginGets += 1
+      cookies.push(req.headers.cookie)
+      if (loginGets === 1) {
+        res.setHeader('Set-Cookie', 'JSESSIONID=stale')
+        res.end(NO_FORM)
+        return
+      }
+      res.setHeader('Set-Cookie', 'JSESSIONID=fresh')
+      res.end(casForm())
+      return
+    }
+    if (url.pathname === '/authserver/checkNeedCaptcha.htl') {
+      cookies.push(req.headers.cookie)
+      res.end('false')
+      return
+    }
+    if (url.pathname === '/authserver/login' && req.method === 'POST') {
+      cookies.push(req.headers.cookie)
+      seen.push({ path: url.pathname, body: await readBody(req) })
+      res.writeHead(302, { Location: '/person' })
+      res.end()
+      return
+    }
+    if (url.pathname === '/person') {
+      res.end('<html>person</html>')
+      return
+    }
+    res.writeHead(404)
+    res.end()
+  })
+  const jw = await listen((req, res, url) => {
+    seen.push({ path: url.pathname, body: '' })
+    if (url.pathname === '/jsxsd/sso.jsp') {
+      res.writeHead(302, { Location: '/jsxsd/framework/xsMain.jsp' })
+      res.end()
+      return
+    }
+    if (url.pathname === '/jsxsd/framework/xsMain.jsp') {
+      res.end('<html>ok</html>')
+      return
+    }
+    res.writeHead(404)
+    res.end()
+  })
+  try {
+    const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: jw.origin })
+    assert.equal(await client.login('user', 'pw'), 'OK')
+    assert.equal(loginGets, 2)
+    assert.equal(cookies[0], undefined)
+    assert.equal(cookies[1], undefined)
+    assert.equal(cookies[2], 'JSESSIONID=fresh')
+    const posted = seen.find((item) => item.path === '/authserver/login')
+    assert.ok(posted)
+    const form = new URLSearchParams(posted.body)
+    assert.notEqual(form.get('password'), 'pw')
+    assert.ok(form.get('password'))
+  } finally {
+    await cas.close()
+    await jw.close()
+  }
+})
+
+test('login throws the Chinese page error when both GETs lack a form', async () => {
+  let loginGets = 0
+  const logged: unknown[][] = []
+  const original = console.error
+  console.error = (...args: unknown[]) => {
+    logged.push(args)
+  }
+  const cas = await listen((req, res, url) => {
+    if (url.pathname === '/authserver/login' && req.method === 'GET') {
+      loginGets += 1
+      res.writeHead(200, { 'Content-Type': 'text/html' })
+      res.end('<html><title>gate</title>\n<p>blocked</p></html>')
+      return
+    }
+    res.writeHead(404)
+    res.end()
+  })
+  try {
+    const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: 'http://127.0.0.1:1' })
+    await assert.rejects(client.login('user-secret', 'pw-secret'), (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.equal(error.message, LOGIN_PAGE_ERROR)
+      return true
+    })
+    assert.equal(loginGets, 2)
+    const line = logged.map((args) => args.map(String).join(' ')).join('\n')
+    assert.match(line, /200/)
+    assert.match(line, /gate/)
+    assert.match(line, /blocked/)
+    assert.equal(line.includes('user-secret'), false)
+    assert.equal(line.includes('pw-secret'), false)
+  } finally {
+    console.error = original
+    await cas.close()
+  }
+})
+
+test('a login form without a salt posts the password unchanged', async () => {
+  const seen: string[] = []
+  const cas = await listen(async (req, res, url) => {
+    if (url.pathname === '/authserver/login' && req.method === 'GET') {
+      res.end(`<form><input type="password" name="password"><input name="lt" value="${LT}"><input name="execution" value="${EXECUTION}"></form>`)
+      return
+    }
+    if (url.pathname === '/authserver/checkNeedCaptcha.htl') {
+      res.end('false')
+      return
+    }
+    if (url.pathname === '/authserver/login' && req.method === 'POST') {
+      seen.push(await readBody(req))
+      res.writeHead(302, { Location: '/person' })
+      res.end()
+      return
+    }
+    if (url.pathname === '/person') {
+      res.end('<html>person</html>')
+      return
+    }
+    res.writeHead(404)
+    res.end()
+  })
+  const jw = await listen((req, res, url) => {
+    if (url.pathname === '/jsxsd/sso.jsp') {
+      res.writeHead(302, { Location: '/jsxsd/framework/xsMain.jsp' })
+      res.end()
+      return
+    }
+    if (url.pathname === '/jsxsd/framework/xsMain.jsp') {
+      res.end('<html>ok</html>')
+      return
+    }
+    res.writeHead(404)
+    res.end()
+  })
+  try {
+    const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: jw.origin })
+    assert.equal(await client.login('user', 'pw-plain'), 'OK')
+    const form = new URLSearchParams(seen[0])
+    assert.equal(form.get('password'), 'pw-plain')
+    assert.equal(form.get('execution'), EXECUTION)
+    assert.equal(form.get('lt'), LT)
+  } finally {
+    await cas.close()
+    await jw.close()
+  }
+})
+
 test('slider-required login returns NEED_SLIDER and does not submit a move', async () => {
   const posts: string[] = []
   const cas = await listen(async (req, res, url) => {
