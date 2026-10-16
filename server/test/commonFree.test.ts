@@ -165,7 +165,7 @@ test('program paste matches known names and reports unknown names', () => {
   })
 })
 
-test('a two-column tab paste matches by teacher name and skips an empty program', () => {
+test('a two-column tab paste matches by teacher name and clears an empty program', () => {
   withDb((db) => {
     replaceSemester(db, {
       semesterCode: SEMESTER,
@@ -173,13 +173,11 @@ test('a two-column tab paste matches by teacher name and skips an empty program'
       teachers: [teacher('张三', [COLLEGE.code])],
     })
     const result = importPrograms(db, '张三\t软件技术\n张三\t\n')
-    assert.equal(result.matched, 1)
+    assert.equal(result.matched, 2)
     assert.deepEqual(result.unmatchedNames, [])
     assert.deepEqual(result.collegeMismatchNames, [])
-    const row = db.prepare('SELECT program_name FROM teacher_programs WHERE teacher_name = ?').get('张三') as {
-      program_name: string
-    }
-    assert.equal(row.program_name, '软件技术')
+    const row = db.prepare('SELECT program_name FROM teacher_programs WHERE teacher_name = ?').get('张三')
+    assert.equal(row, undefined)
   })
 })
 

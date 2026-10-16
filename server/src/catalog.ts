@@ -175,6 +175,7 @@ export function importPrograms(
     VALUES (?, ?)
     ON CONFLICT(teacher_name) DO UPDATE SET program_name = excluded.program_name
   `)
+  const deleteProgram = db.prepare('DELETE FROM teacher_programs WHERE teacher_name = ?')
 
   db.exec('BEGIN')
   try {
@@ -187,10 +188,15 @@ export function importPrograms(
       const twoColumns = parts.length === 2
       const college = twoColumns ? '' : (parts[1]?.trim() ?? '')
       const programName = (twoColumns ? parts[1] : parts.slice(2).join(',')).trim()
-      if (name.length === 0 || programName.length === 0) continue
+      if (name.length === 0) continue
       const teacher = findTeacher.get(name) as { name: string } | undefined
       if (!teacher) {
         unmatchedNames.push(name)
+        continue
+      }
+      if (programName.length === 0) {
+        deleteProgram.run(name)
+        matched += 1
         continue
       }
       if (college.length > 0) {

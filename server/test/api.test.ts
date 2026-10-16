@@ -126,7 +126,12 @@ test('POST /api/presets then DELETE removes the group and its members', async ()
     assert.equal(listed.statusCode, 200)
     assert.equal(listed.json().length, 1)
 
-    const removed = await app.inject({ method: 'DELETE', url: '/api/presets/软件组' })
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: '/api/presets/软件组',
+      headers: { 'content-type': 'application/json' },
+      payload: '',
+    })
     assert.equal(removed.statusCode, 204)
     const after = await app.inject({ method: 'GET', url: '/api/presets' })
     assert.deepEqual(after.json(), [])
@@ -207,5 +212,47 @@ test('program import and semester list use the existing catalog', async () => {
       unmatchedNames: ['不存在'],
       collegeMismatchNames: [],
     })
+
+    const stored = db.prepare('SELECT program_name FROM teacher_programs WHERE teacher_name = ?').get('张三') as {
+      program_name: string
+    }
+    assert.equal(stored.program_name, '软件技术')
+
+    const clearedTwo = await app.inject({
+      method: 'POST',
+      url: '/api/programs/import',
+      payload: { text: '张三,' },
+    })
+    assert.equal(clearedTwo.statusCode, 200)
+    assert.deepEqual(clearedTwo.json(), { matched: 1, unmatchedNames: [], collegeMismatchNames: [] })
+    assert.equal(
+      db.prepare('SELECT program_name FROM teacher_programs WHERE teacher_name = ?').get('张三'),
+      undefined,
+    )
+
+    const restored = await app.inject({
+      method: 'POST',
+      url: '/api/programs/import',
+      payload: { text: '张三,智能制造学院,软件技术' },
+    })
+    assert.equal(restored.statusCode, 200)
+    const clearedThree = await app.inject({
+      method: 'POST',
+      url: '/api/programs/import',
+      payload: { text: '张三,智能制造学院,' },
+    })
+    assert.equal(clearedThree.statusCode, 200)
+    assert.equal(clearedThree.json().matched, 1)
+    assert.equal(
+      db.prepare('SELECT program_name FROM teacher_programs WHERE teacher_name = ?').get('张三'),
+      undefined,
+    )
+
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/api/programs/import',
+      payload: { text: '不存在,' },
+    })
+    assert.deepEqual(missing.json().unmatchedNames, ['不存在'])
   }, () => new Date('2026-08-14T00:00:00.000Z'))
 })

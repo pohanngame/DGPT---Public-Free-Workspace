@@ -250,6 +250,66 @@ test('slider sign uses a 16-byte salt when safeSecure is present but not 16 byte
   }
 })
 
+test('teacher page follows 302 cookies and two clients do not share a jar', async () => {
+  const seen: { cookie: string | undefined; method: string | undefined; path: string }[] = []
+  let tablePosts = 0
+  const jw = await listen((req, res, url) => {
+    seen.push({ cookie: req.headers.cookie, method: req.method, path: url.pathname })
+    if (url.pathname === '/jsxsd/framework/xsMain.jsp') {
+      res.end('<html>main</html>')
+      return
+    }
+    if (url.pathname === '/jsxsd/kbcx/kbxx_teacher') {
+      if (req.headers.cookie !== 'JSESSIONID=second') {
+        res.writeHead(302, { 'Set-Cookie': 'JSESSIONID=second', Location: '/jsxsd/kbcx/kbxx_teacher' })
+        res.end()
+        return
+      }
+      res.end('<html>teachers</html>')
+      return
+    }
+    if (url.pathname === '/jsxsd/kbcx/kbxx_teacher_ifr') {
+      if (req.method === 'POST') {
+        tablePosts += 1
+        if (tablePosts === 1) {
+          res.writeHead(302, {
+            'Set-Cookie': 'JSESSIONID=second',
+            Location: '/jsxsd/kbcx/kbxx_teacher_ifr?done=1',
+          })
+          res.end()
+          return
+        }
+      }
+      res.end('<table>ok</table>')
+      return
+    }
+    res.writeHead(404)
+    res.end()
+  })
+  try {
+    const first = createJwClient({ casBaseUrl: 'http://127.0.0.1:1', jwBaseUrl: jw.origin })
+    const html = await first.fetchTeacherPage()
+    assert.equal(html, '<html>teachers</html>')
+    const table = await first.fetchCollegeTable({
+      semesterCode: '2025-2026-1',
+      kbjcmsid: 'k1',
+      collegeCode: '0100',
+    })
+    assert.equal(table, '<table>ok</table>')
+    const second = createJwClient({ casBaseUrl: 'http://127.0.0.1:1', jwBaseUrl: jw.origin })
+    await second.fetchTeacherPage()
+    const teacherHits = seen.filter((item) => item.path === '/jsxsd/kbcx/kbxx_teacher')
+    assert.equal(teacherHits[0]?.cookie, undefined)
+    assert.equal(teacherHits[2]?.cookie, undefined)
+    const tableHits = seen.filter((item) => item.path.startsWith('/jsxsd/kbcx/kbxx_teacher_ifr'))
+    assert.equal(tableHits[0]?.method, 'POST')
+    assert.equal(tableHits[1]?.method, 'GET')
+    assert.ok(seen.some((item) => item.path === '/jsxsd/framework/xsMain.jsp'))
+  } finally {
+    await jw.close()
+  }
+})
+
 test('http://example.com throws before any request', async () => {
   let hits = 0
   const original = globalThis.fetch

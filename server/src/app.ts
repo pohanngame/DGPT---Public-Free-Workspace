@@ -51,6 +51,22 @@ export interface BuildAppOptions {
 export function buildApp(db: DatabaseSync, options: BuildAppOptions = {}): FastifyInstance {
   const now = options.now ?? (() => new Date())
   const app = Fastify({ logger: false })
+  app.removeContentTypeParser('application/json')
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
+    const raw = typeof body === 'string' ? body : body.toString('utf8')
+    if (raw.length === 0 && (request.method === 'DELETE' || request.headers['content-length'] === '0')) {
+      done(null, {})
+      return
+    }
+    try {
+      const json = JSON.parse(raw)
+      done(null, json)
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('Unexpected token in JSON')
+      Object.assign(err, { statusCode: 400 })
+      done(err, undefined)
+    }
+  })
 
   app.setErrorHandler((error, _request, reply) => {
     const code = codeOf(error)
@@ -115,7 +131,7 @@ export function buildApp(db: DatabaseSync, options: BuildAppOptions = {}): Fasti
     return updateSettings(db, { week1Monday: body.week1Monday }, now())
   })
 
-  app.post<{ Body: { text?: unknown } }>('/api/programs/import', async (request) => {
+  app.post<{ Body: { text?: unknown } | undefined }>('/api/programs/import', async (request) => {
     const body = request.body ?? {}
     if (typeof body.text !== 'string') {
       throw new CatalogError('VALIDATION_ERROR', 'text is required')

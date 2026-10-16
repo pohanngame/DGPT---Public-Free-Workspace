@@ -20,7 +20,7 @@ interface StoredCookie {
 export function createJwClient(options: JwClientOptions = {}): JwClient {
   const cookies: StoredCookie[] = []
   let sliderKey = ''
-  const timeoutMs = options.timeoutMs ?? 20_000
+  const timeoutMs = options.timeoutMs ?? 60_000
   const casBase = () => trimSlash(options.casBaseUrl ?? process.env.JW_BASE_URL ?? 'https://authserver.dgpt.edu.cn')
   const jwBase = () => trimSlash(options.jwBaseUrl ?? process.env.JW_JW_BASE_URL ?? 'https://jw.dgpt.edu.cn')
 
@@ -94,9 +94,9 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
     },
 
     async fetchTeacherPage() {
-      const response = await send(cookies, `${jwBase()}/jsxsd/kbcx/kbxx_teacher`, { timeoutMs })
-      if (response.status !== 200) throw httpError(response.status)
-      return response.text()
+      const base = jwBase()
+      await followGet(cookies, `${base}/jsxsd/framework/xsMain.jsp`, timeoutMs)
+      return followGet(cookies, `${base}/jsxsd/kbcx/kbxx_teacher`, timeoutMs)
     },
 
     async fetchCollegeTable(input) {
@@ -137,8 +137,33 @@ async function postTeacherTable(
     referer: `${jwBase}/jsxsd/kbcx/kbxx_teacher`,
     timeoutMs,
   })
-  if (response.status !== 200) throw httpError(response.status)
-  return response.text()
+  return finishRedirect(cookies, response, `${jwBase}/jsxsd/kbcx/kbxx_teacher_ifr`, timeoutMs)
+}
+
+async function followGet(cookies: StoredCookie[], url: string, timeoutMs: number): Promise<string> {
+  const response = await send(cookies, url, { timeoutMs })
+  return finishRedirect(cookies, response, url, timeoutMs)
+}
+
+async function finishRedirect(
+  cookies: StoredCookie[],
+  first: Response,
+  url: string,
+  timeoutMs: number,
+): Promise<string> {
+  let response = first
+  let current = url
+  for (let hop = 0; hop < 10; hop++) {
+    if (response.status === 200) return response.text()
+    if (!isRedirect(response.status)) throw httpError(response.status)
+    const location = response.headers.get('location')
+    if (!location) throw httpError(response.status)
+    current = new URL(location, current).toString()
+    await response.text().catch(() => undefined)
+    response = await send(cookies, current, { timeoutMs })
+  }
+  if (response.status === 200) return response.text()
+  throw new Error('redirect chain too long')
 }
 
 async function openSlider(
