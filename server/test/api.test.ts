@@ -157,12 +157,40 @@ test('sync start without a client returns 500 and does not replace catalog route
   })
 })
 
+function semesterWindow(year: number, synced: ReadonlySet<string>) {
+  const items = []
+  for (let start = year - 3; start <= year + 1; start += 1) {
+    for (const term of [1, 2]) {
+      const code = `${start}-${start + 1}-${term}`
+      items.push({
+        code,
+        label: code,
+        isCurrent: code === `${year}-${year + 1}-1`,
+        synced: synced.has(code),
+      })
+    }
+  }
+  return items
+}
+
+test('GET /api/semesters on an empty database lists the 2026 window unsynced', async () => {
+  await withApp(async (app) => {
+    const response = await app.inject({ method: 'GET', url: '/api/semesters' })
+    assert.equal(response.statusCode, 200)
+    const body = response.json() as { code: string; isCurrent: boolean; synced: boolean }[]
+    const current = body.find((item) => item.code === '2026-2027-1')
+    assert.deepEqual(current, { code: '2026-2027-1', label: '2026-2027-1', isCurrent: true, synced: false })
+    assert.ok(body.some((item) => item.code === '2023-2024-1'))
+    assert.equal(body.some((item) => item.code === '2022-2023-1'), false)
+  }, () => new Date('2026-08-14T00:00:00.000Z'))
+})
+
 test('program import and semester list use the existing catalog', async () => {
   await withApp(async (app, db) => {
     seed(db, ['张三'])
     const semesters = await app.inject({ method: 'GET', url: '/api/semesters' })
     assert.equal(semesters.statusCode, 200)
-    assert.deepEqual(semesters.json(), [{ code: SEMESTER, label: SEMESTER, isCurrent: false }])
+    assert.deepEqual(semesters.json(), semesterWindow(2026, new Set([SEMESTER])))
 
     const colleges = await app.inject({ method: 'GET', url: '/api/colleges' })
     assert.equal(colleges.statusCode, 200)
@@ -179,5 +207,5 @@ test('program import and semester list use the existing catalog', async () => {
       unmatchedNames: ['不存在'],
       collegeMismatchNames: [],
     })
-  })
+  }, () => new Date('2026-08-14T00:00:00.000Z'))
 })

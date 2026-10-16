@@ -23,6 +23,7 @@ export interface Semester {
   code: string
   label: string
   isCurrent: boolean
+  synced: boolean
 }
 
 export interface College {

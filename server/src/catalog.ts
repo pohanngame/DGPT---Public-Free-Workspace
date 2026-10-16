@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import type { College, Paginated, PresetGroup, Settings, Teacher } from './contract.ts'
+import type { College, Paginated, PresetGroup, Semester, Settings, Teacher } from './contract.ts'
 
 export class CatalogError extends Error {
   readonly code: string
@@ -296,14 +296,22 @@ export function searchTeachers(db: DatabaseSync, query: TeacherSearchQuery): Pag
   }
 }
 
-export function listSemesters(db: DatabaseSync): { code: string; label: string; isCurrent: boolean }[] {
-  const rows = db
-    .prepare('SELECT code, label, is_current FROM semesters ORDER BY code')
-    .all() as { code: string; label: string; is_current: number }[]
-  return rows.map((row) => ({
-    code: row.code,
-    label: row.label,
-    isCurrent: row.is_current === 1,
+export function listSemesters(db: DatabaseSync, now = new Date()): Semester[] {
+  const stored = new Set(
+    (db.prepare('SELECT code FROM semesters').all() as { code: string }[]).map((row) => row.code),
+  )
+  const year = now.getFullYear()
+  const codes = new Set(stored)
+  for (let start = year - 3; start <= year + 1; start += 1) {
+    codes.add(`${start}-${start + 1}-1`)
+    codes.add(`${start}-${start + 1}-2`)
+  }
+  const current = `${year}-${year + 1}-1`
+  return [...codes].sort().map((code) => ({
+    code,
+    label: code,
+    isCurrent: code === current,
+    synced: stored.has(code),
   }))
 }
 

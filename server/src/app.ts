@@ -62,7 +62,7 @@ export function buildApp(db: DatabaseSync, options: BuildAppOptions = {}): Fasti
     return reply.code(500).send(errorBody('INTERNAL', message))
   })
 
-  app.get('/api/semesters', async () => listSemesters(db))
+  app.get('/api/semesters', async () => listSemesters(db, now()))
   app.get('/api/colleges', async () => listColleges(db))
 
   app.get<{
