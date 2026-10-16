@@ -27,9 +27,7 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
   return {
     async login(username, password) {
       const loginUrl = `${casBase()}/authserver/login`
-      const opened = await send(cookies, loginUrl, { timeoutMs })
-      if (opened.status !== 200) throw httpError(opened.status)
-      const html = await opened.text()
+      const html = await followGet(cookies, loginUrl, timeoutMs)
       const form = findLoginForm(html)
       if (!form) throw new Error('login form with pwdEncryptSalt not found')
       const salt = matchValue(form, /id=["']pwdEncryptSalt["'][^>]*value=["']([^"']+)["']/i)
@@ -57,15 +55,10 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
       const posted = await send(cookies, loginUrl, { method: 'POST', body, referer: loginUrl, timeoutMs })
       const location = posted.headers.get('location')
       if (location?.includes('error')) throw new Error('credentials rejected')
-      let chain = `${jwBase()}/jsxsd/sso.jsp`
-      if (isRedirect(posted.status) && location) {
-        chain = new URL(location, loginUrl).toString()
-      } else if (!isRedirect(posted.status) && posted.status !== 200) {
-        throw httpError(posted.status)
-      } else {
-        await posted.text()
-      }
-      const landed = await follow(cookies, chain, timeoutMs)
+      const chain = isRedirect(posted.status) && location ? new URL(location, loginUrl).toString() : `${jwBase()}/jsxsd/sso.jsp`
+      const landed = isRedirect(posted.status)
+        ? await followResponse(cookies, posted, loginUrl, timeoutMs)
+        : await follow(cookies, chain, timeoutMs)
       if (!new URL(landed.url).pathname.startsWith('/jsxsd/')) {
         await follow(cookies, `${jwBase()}/jsxsd/sso.jsp`, timeoutMs)
       }
@@ -143,6 +136,18 @@ async function postTeacherTable(
 async function followGet(cookies: StoredCookie[], url: string, timeoutMs: number): Promise<string> {
   const response = await send(cookies, url, { timeoutMs })
   return finishRedirect(cookies, response, url, timeoutMs)
+}
+
+async function followResponse(
+  cookies: StoredCookie[],
+  first: Response,
+  url: string,
+  timeoutMs: number,
+): Promise<{ url: string; status: number }> {
+  const html = await finishRedirect(cookies, first, url, timeoutMs)
+  const target = scriptRedirect(html)
+  const next = target ? new URL(target, url).toString() : url
+  return target ? follow(cookies, next, timeoutMs) : { url, status: 200 }
 }
 
 async function finishRedirect(
