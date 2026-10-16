@@ -181,11 +181,13 @@ export function importPrograms(
     for (const rawLine of text.split(/\r?\n/)) {
       const line = rawLine.trim()
       if (line.length === 0) continue
-      const parts = line.split(',')
+      const tabbed = line.split('\t').map((part) => part.trim())
+      const parts = tabbed.length >= 2 ? tabbed : line.split(',')
       const name = parts[0]?.trim() ?? ''
-      const college = parts[1]?.trim() ?? ''
-      const programName = parts.slice(2).join(',').trim()
-      if (name.length === 0) continue
+      const twoColumns = parts.length === 2
+      const college = twoColumns ? '' : (parts[1]?.trim() ?? '')
+      const programName = (twoColumns ? parts[1] : parts.slice(2).join(',')).trim()
+      if (name.length === 0 || programName.length === 0) continue
       const teacher = findTeacher.get(name) as { name: string } | undefined
       if (!teacher) {
         unmatchedNames.push(name)

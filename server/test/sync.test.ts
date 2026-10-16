@@ -18,13 +18,21 @@ function teacherPage(colleges: { code: string; name: string }[], kbjcmsid = '<op
 <select name="skyx">${collegeOptions}</select>`
 }
 
-function collegeTable(teacherName: string): string {
+function teacherRow(teacherName: string): string {
   const empty = '<td></td>'
-  const cells = [ `<td><nobr>${teacherName}</nobr></td>`, ...Array.from({ length: 42 }, () => empty) ].join('')
-  return `<table id="kbtable"><tr><td>header</td></tr><tr><td>slots</td></tr><tr>${cells}</tr></table>`
+  const cells = [`<td><nobr>${teacherName}</nobr></td>`, ...Array.from({ length: 42 }, () => empty)].join('')
+  return `<tr>${cells}</tr>`
 }
 
-function fakeClient(pages: { teacher: string; tables: Record<string, string | Error> }): JwClient & { tablesFetched: string[] } {
+function collegeTable(...teacherNames: string[]): string {
+  return `<table id="kbtable"><tr><td>header</td></tr><tr><td>slots</td></tr>${teacherNames.map(teacherRow).join('')}</table>`
+}
+
+function fakeClient(pages: {
+  teacher: string
+  tables: Record<string, string | Error>
+  allTeachers?: string | Error
+}): JwClient & { tablesFetched: string[] } {
   const tablesFetched: string[] = []
   return {
     tablesFetched,
@@ -43,6 +51,11 @@ function fakeClient(pages: { teacher: string; tables: Record<string, string | Er
       if (table instanceof Error) throw table
       if (table === undefined) throw new Error(`missing table ${input.collegeCode}`)
       return table
+    },
+    async fetchAllTeachersTable() {
+      tablesFetched.push('UNAFFILIATED')
+      if (pages.allTeachers instanceof Error) throw pages.allTeachers
+      return pages.allTeachers ?? collegeTable('')
     },
   }
 }
@@ -82,6 +95,7 @@ test('two colleges write both college links in one replace', async () => {
       { code: 'c2', name: '学院二' },
     ]),
     tables: { c1: collegeTable('甲'), c2: collegeTable('乙') },
+    allTeachers: collegeTable('甲', '丙'),
   })
   await withApp(client, async (app, db) => {
     const started = await app.inject({
@@ -93,17 +107,24 @@ test('two colleges write both college links in one replace', async () => {
     const jobId = started.json().jobId as string
     const progress = await waitUntilSettled(app, jobId)
     assert.equal(progress.status, 'DONE')
-    assert.equal(progress.totalColleges, 2)
-    assert.equal(progress.finishedColleges, 2)
-    assert.equal(progress.teacherCount, 2)
+    assert.equal(progress.totalColleges, 3)
+    assert.equal(progress.finishedColleges, 3)
+    assert.equal(progress.teacherCount, 3)
     const links = db
       .prepare('SELECT teacher_name, college_code FROM teacher_colleges')
       .all() as { teacher_name: string; college_code: string }[]
     assert.deepEqual(
       links.map((link) => `${link.teacher_name}:${link.college_code}`).sort(),
-      ['乙:c2', '甲:c1'].sort(),
+      ['丙:UNAFFILIATED', '乙:c2', '甲:c1'].sort(),
     )
-    assert.deepEqual(client.tablesFetched, ['c1', 'c2'])
+    const label = db.prepare('SELECT name FROM colleges WHERE code = ?').get('UNAFFILIATED') as { name: string }
+    assert.equal(label.name, '未分院系')
+    const jia = links.filter((link) => link.teacher_name === '甲')
+    assert.deepEqual(
+      jia.map((link) => `${link.teacher_name}:${link.college_code}`),
+      ['甲:c1'],
+    )
+    assert.deepEqual(client.tablesFetched, ['c1', 'c2', 'UNAFFILIATED'])
   })
 })
 
@@ -147,6 +168,9 @@ test('NEED_SLIDER stays on the same job until the slider is submitted', async ()
     },
     async fetchCollegeTable(input) {
       tablesFetched.push(input.collegeCode)
+      return collegeTable('甲')
+    },
+    async fetchAllTeachersTable() {
       return collegeTable('甲')
     },
   }
@@ -237,6 +261,9 @@ test('missing credentials with empty env return 422 and start no job', async () 
       return ''
     },
     async fetchCollegeTable() {
+      return ''
+    },
+    async fetchAllTeachersTable() {
       return ''
     },
   }

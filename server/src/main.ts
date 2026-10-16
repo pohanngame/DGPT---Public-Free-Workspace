@@ -2,8 +2,10 @@ import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { buildApp } from './app.ts'
 import { openDatabase } from './db.ts'
+import { readEnvLocal } from './envFile.ts'
 import { createJwClient } from './jw/client.ts'
 
+readEnvLocal()
 const port = Number(process.env.PORT ?? 3000)
 const file = join(process.cwd(), 'data', 'app.sqlite')
 mkdirSync(dirname(file), { recursive: true })

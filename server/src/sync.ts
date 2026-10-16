@@ -16,6 +16,7 @@ export interface JwClient {
   ): Promise<'OK' | { code: 'SLIDER_FAILED'; message: string }>
   fetchTeacherPage(): Promise<string>
   fetchCollegeTable(input: { semesterCode: string; kbjcmsid: string; collegeCode: string }): Promise<string>
+  fetchAllTeachersTable(input: { semesterCode: string; kbjcmsid: string }): Promise<string>
 }
 
 export interface SyncStartInput {
@@ -156,7 +157,7 @@ async function fetchTables(db: DatabaseSync, client: JwClient, job: ActiveJob): 
   try {
     const page = parseTeacherPage(await client.fetchTeacherPage())
     const colleges = page.colleges
-    job.totalColleges = colleges.length
+    job.totalColleges = colleges.length + 1
     const byTeacher = new Map<string, { collegeCodes: string[]; cells: ParsedCell[] }>()
 
     for (const college of colleges) {
@@ -167,18 +168,23 @@ async function fetchTables(db: DatabaseSync, client: JwClient, job: ActiveJob): 
         kbjcmsid: page.kbjcmsid,
         collegeCode: college.code,
       })
-      const rows = parseTeacherTable(html)
-      for (const row of rows) {
-        const existing = byTeacher.get(row.name)
-        if (existing) {
-          if (!existing.collegeCodes.includes(college.code)) existing.collegeCodes.push(college.code)
-          existing.cells.push(...row.cells)
-        } else {
-          byTeacher.set(row.name, { collegeCodes: [college.code], cells: [...row.cells] })
-        }
-      }
+      mergeRows(byTeacher, parseTeacherTable(html), college.code)
       job.finishedColleges += 1
     }
+
+    if (job.status !== 'RUNNING') return
+    job.currentCollege = 'UNAFFILIATED'
+    const allSchool = await client.fetchAllTeachersTable({
+      semesterCode: job.semesterCode,
+      kbjcmsid: page.kbjcmsid,
+    })
+    let unaffiliated = 0
+    for (const row of parseTeacherTable(allSchool)) {
+      if (byTeacher.has(row.name)) continue
+      byTeacher.set(row.name, { collegeCodes: ['UNAFFILIATED'], cells: [...row.cells] })
+      unaffiliated += 1
+    }
+    job.finishedColleges += 1
 
     const teachers = [...byTeacher.entries()].map(([name, teacher]) => ({
       name,
@@ -187,7 +193,10 @@ async function fetchTables(db: DatabaseSync, client: JwClient, job: ActiveJob): 
     }))
     const imported: SemesterImport = {
       semesterCode: job.semesterCode,
-      colleges,
+      colleges:
+        unaffiliated > 0
+          ? [...colleges, { code: 'UNAFFILIATED', name: '未分院系', shortCode: null }]
+          : colleges,
       teachers,
     }
     replaceSemester(db, imported)
@@ -201,6 +210,22 @@ async function fetchTables(db: DatabaseSync, client: JwClient, job: ActiveJob): 
   } catch (error) {
     if (job.currentCollege && job.failedColleges.length === 0) job.failedColleges = [job.currentCollege]
     fail(job, messageOf(error))
+  }
+}
+
+function mergeRows(
+  byTeacher: Map<string, { collegeCodes: string[]; cells: ParsedCell[] }>,
+  rows: { name: string; cells: ParsedCell[] }[],
+  collegeCode: string,
+): void {
+  for (const row of rows) {
+    const existing = byTeacher.get(row.name)
+    if (existing) {
+      if (!existing.collegeCodes.includes(collegeCode)) existing.collegeCodes.push(collegeCode)
+      existing.cells.push(...row.cells)
+    } else {
+      byTeacher.set(row.name, { collegeCodes: [collegeCode], cells: [...row.cells] })
+    }
   }
 }
 

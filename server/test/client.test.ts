@@ -140,6 +140,16 @@ test('fetchCollegeTable posts skyx and refuses an empty college code', async () 
     assert.equal(form.get('kbjcmsid'), 'k1')
     assert.equal(form.get('zc1'), '1')
     assert.equal(form.get('zc2'), '30')
+    body = ''
+    const allSchool = await client.fetchAllTeachersTable({
+      semesterCode: '2025-2026-1',
+      kbjcmsid: 'k1',
+    })
+    assert.equal(allSchool, '<table></table>')
+    const allForm = new URLSearchParams(body)
+    assert.equal(allForm.get('skyx'), '')
+    assert.equal(allForm.get('xnxqh'), '2025-2026-1')
+    assert.equal(allForm.get('kbjcmsid'), 'k1')
   } finally {
     await jw.close()
   }

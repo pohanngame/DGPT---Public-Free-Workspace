@@ -101,29 +101,44 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
 
     async fetchCollegeTable(input) {
       if (!input.collegeCode) throw new Error('collegeCode is required')
-      const body = new URLSearchParams({
-        xnxqh: input.semesterCode,
-        kbjcmsid: input.kbjcmsid,
-        skyx: input.collegeCode,
-        skjsid: '',
-        skjs: '',
-        zc1: '1',
-        zc2: '30',
-        skxq1: '',
-        skxq2: '',
-        jc1: '',
-        jc2: '',
-      })
-      const response = await send(cookies, `${jwBase()}/jsxsd/kbcx/kbxx_teacher_ifr`, {
-        method: 'POST',
-        body,
-        referer: `${jwBase()}/jsxsd/kbcx/kbxx_teacher`,
-        timeoutMs,
-      })
-      if (response.status !== 200) throw httpError(response.status)
-      return response.text()
+      return postTeacherTable(cookies, jwBase(), timeoutMs, input.semesterCode, input.kbjcmsid, input.collegeCode)
+    },
+
+    async fetchAllTeachersTable(input) {
+      return postTeacherTable(cookies, jwBase(), timeoutMs, input.semesterCode, input.kbjcmsid, '')
     },
   }
+}
+
+async function postTeacherTable(
+  cookies: StoredCookie[],
+  jwBase: string,
+  timeoutMs: number,
+  semesterCode: string,
+  kbjcmsid: string,
+  skyx: string,
+): Promise<string> {
+  const body = new URLSearchParams({
+    xnxqh: semesterCode,
+    kbjcmsid,
+    skyx,
+    skjsid: '',
+    skjs: '',
+    zc1: '1',
+    zc2: '30',
+    skxq1: '',
+    skxq2: '',
+    jc1: '',
+    jc2: '',
+  })
+  const response = await send(cookies, `${jwBase}/jsxsd/kbcx/kbxx_teacher_ifr`, {
+    method: 'POST',
+    body,
+    referer: `${jwBase}/jsxsd/kbcx/kbxx_teacher`,
+    timeoutMs,
+  })
+  if (response.status !== 200) throw httpError(response.status)
+  return response.text()
 }
 
 async function openSlider(
@@ -307,9 +322,15 @@ function httpError(status: number): Error {
 function assertAllowedHost(url: string): void {
   const parsed = new URL(url)
   const loopback = parsed.protocol === 'http:' && parsed.hostname === '127.0.0.1'
-  if (!loopback && parsed.protocol !== 'https:') {
-    throw new Error('base URL must be http://127.0.0.1 or https')
+  const academicHost = new URL(jwHost()).hostname
+  const academicHttp = parsed.protocol === 'http:' && parsed.hostname === academicHost
+  if (!loopback && !academicHttp && parsed.protocol !== 'https:') {
+    throw new Error(`base URL must be http://127.0.0.1 or https, got ${parsed.protocol}//${parsed.hostname}`)
   }
+}
+
+function jwHost(): string {
+  return trimSlash(process.env.JW_JW_BASE_URL ?? 'https://jw.dgpt.edu.cn')
 }
 
 function trimSlash(value: string): string {
