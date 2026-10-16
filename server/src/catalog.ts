@@ -1,5 +1,22 @@
+import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import type { College, Paginated, Teacher } from './contract.ts'
+import type { College, Paginated, PresetGroup, Settings, Teacher } from './contract.ts'
+
+export class CatalogError extends Error {
+  readonly code: string
+  readonly details?: unknown
+
+  constructor(code: string, message: string, details?: unknown) {
+    super(message)
+    this.name = 'CatalogError'
+    this.code = code
+    this.details = details
+  }
+}
+
+function validationError(message: string, details?: unknown): CatalogError {
+  return new CatalogError('VALIDATION_ERROR', message, details)
+}
 
 export interface SemesterImport {
   semesterCode: string
@@ -271,4 +288,147 @@ export function searchTeachers(db: DatabaseSync, query: TeacherSearchQuery): Pag
     data,
     pagination: { page, pageSize, totalItems, totalPages },
   }
+}
+
+export function listSemesters(db: DatabaseSync): { code: string; label: string; isCurrent: boolean }[] {
+  const rows = db
+    .prepare('SELECT code, label, is_current FROM semesters ORDER BY code')
+    .all() as { code: string; label: string; is_current: number }[]
+  return rows.map((row) => ({
+    code: row.code,
+    label: row.label,
+    isCurrent: row.is_current === 1,
+  }))
+}
+
+export function listColleges(db: DatabaseSync): College[] {
+  const rows = db
+    .prepare('SELECT code, name, short_code FROM colleges ORDER BY code')
+    .all() as { code: string; name: string; short_code: string | null }[]
+  return rows.map((row) => ({
+    code: row.code,
+    name: row.name,
+    shortCode: row.short_code,
+  }))
+}
+
+export function listPresetGroups(db: DatabaseSync): PresetGroup[] {
+  const groups = db
+    .prepare('SELECT id, name FROM preset_groups ORDER BY created_at, name')
+    .all() as { id: string; name: string }[]
+  const members = db.prepare(
+    'SELECT teacher_name FROM preset_group_members WHERE group_id = ? ORDER BY teacher_name',
+  )
+  return groups.map((group) => ({
+    id: group.id,
+    name: group.name,
+    teacherNames: (members.all(group.id) as { teacher_name: string }[]).map((row) => row.teacher_name),
+  }))
+}
+
+export function createPresetGroup(
+  db: DatabaseSync,
+  input: { name: string; teacherNames: string[] },
+): PresetGroup {
+  const name = input.name.trim()
+  if (name.length === 0) throw validationError('name must not be empty')
+  if (input.teacherNames.length === 0) throw validationError('teacherNames must not be empty')
+
+  const findTeacher = db.prepare('SELECT name FROM teachers WHERE name = ?')
+  const unknown = input.teacherNames.filter((teacherName) => !findTeacher.get(teacherName))
+  if (unknown.length > 0) {
+    throw validationError('unknown teachers', { unmatchedNames: unknown })
+  }
+
+  const id = randomUUID()
+  const createdAt = new Date().toISOString()
+  const insertGroup = db.prepare('INSERT INTO preset_groups (id, name, created_at) VALUES (?, ?, ?)')
+  const insertMember = db.prepare(
+    'INSERT INTO preset_group_members (group_id, teacher_name) VALUES (?, ?)',
+  )
+
+  db.exec('BEGIN')
+  try {
+    insertGroup.run(id, name, createdAt)
+    for (const teacherName of input.teacherNames) {
+      insertMember.run(id, teacherName)
+    }
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+
+  return { id, name, teacherNames: [...input.teacherNames] }
+}
+
+export function deletePresetGroup(db: DatabaseSync, name: string): void {
+  const group = db.prepare('SELECT id FROM preset_groups WHERE name = ?').get(name) as { id: string } | undefined
+  if (!group) throw validationError('preset not found')
+  db.exec('BEGIN')
+  try {
+    db.prepare('DELETE FROM preset_group_members WHERE group_id = ?').run(group.id)
+    db.prepare('DELETE FROM preset_groups WHERE id = ?').run(group.id)
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+}
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+
+function shanghaiDate(now: Date): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now)
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value)
+  return { year: value('year'), month: value('month'), day: value('day') }
+}
+
+function utcDayNumber(year: number, month: number, day: number): number {
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000)
+}
+
+/** Week 1 is the Monday-start week that contains week1Monday, clamped to 1..30. */
+export function currentWeek(week1Monday: string | null, now: Date): number {
+  if (week1Monday === null) return 1
+  const match = DATE.exec(week1Monday)
+  if (!match) return 1
+  const anchor = utcDayNumber(Number(week1Monday.slice(0, 4)), Number(week1Monday.slice(5, 7)), Number(week1Monday.slice(8, 10)))
+  const today = shanghaiDate(now)
+  const todayNumber = utcDayNumber(today.year, today.month, today.day)
+  const anchorMonday = new Date(Date.UTC(Number(week1Monday.slice(0, 4)), Number(week1Monday.slice(5, 7)) - 1, Number(week1Monday.slice(8, 10))))
+  const weekday = anchorMonday.getUTCDay()
+  const daysFromMonday = weekday === 0 ? 6 : weekday - 1
+  const week = Math.floor((todayNumber - (anchor - daysFromMonday)) / 7) + 1
+  return Math.min(30, Math.max(1, week))
+}
+
+export function getSettings(db: DatabaseSync, now: Date = new Date()): Settings {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('week1Monday') as { value: string } | undefined
+  const week1Monday = row?.value ?? null
+  return { week1Monday, currentWeek: currentWeek(week1Monday, now) }
+}
+
+export function updateSettings(
+  db: DatabaseSync,
+  input: { week1Monday: string | null },
+  now: Date = new Date(),
+): Settings {
+  if (input.week1Monday !== null && !DATE.test(input.week1Monday)) {
+    throw validationError('week1Monday must be YYYY-MM-DD or null')
+  }
+  if (input.week1Monday === null) {
+    db.prepare('DELETE FROM settings WHERE key = ?').run('week1Monday')
+  } else {
+    db.prepare(
+      `INSERT INTO settings (key, value) VALUES ('week1Monday', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    ).run(input.week1Monday)
+  }
+  return getSettings(db, now)
 }
