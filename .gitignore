@@ -1,0 +1,11 @@
+node_modules/
+.env.local
+*.sqlite
+*.sqlite-*
+*.sqlite-journal
+.jw_cookie_cache.json
+probe/out/
+data/
+dist/
+*.tsbuildinfo
+xu-shu-xitong/
