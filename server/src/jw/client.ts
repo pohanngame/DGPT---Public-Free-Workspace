@@ -27,7 +27,8 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
   return {
     async login(username, password) {
       const loginUrl = `${casBase()}/authserver/login`
-      const html = await followGet(cookies, loginUrl, timeoutMs)
+      const opened = await send(cookies, loginUrl, { timeoutMs })
+      const html = opened.status === 200 ? await opened.text() : await finishRedirect(cookies, opened, loginUrl, timeoutMs)
       const form = findLoginForm(html)
       if (!form) throw new Error('login form with pwdEncryptSalt not found')
       const salt = matchValue(form, /id=["']pwdEncryptSalt["'][^>]*value=["']([^"']+)["']/i)
