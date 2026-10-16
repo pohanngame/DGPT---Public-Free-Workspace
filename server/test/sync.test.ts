@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import { buildApp } from '../src/app.ts'
 import { openDatabase } from '../src/db.ts'
 import type { JwClient } from '../src/sync.ts'
-import { resetSyncJobs } from '../src/sync.ts'
+import { peekSyncJob, resetSyncJobs } from '../src/sync.ts'
 import type { SyncProgress } from '../src/contract.ts'
 
 const SEMESTER = '2026-2027-1'
@@ -104,6 +104,28 @@ test('two colleges write both college links in one replace', async () => {
       ['乙:c2', '甲:c1'].sort(),
     )
     assert.deepEqual(client.tablesFetched, ['c1', 'c2'])
+  })
+})
+
+test('a finished job keeps progress but drops the password', async () => {
+  const client = fakeClient({
+    teacher: teacherPage([{ code: 'c1', name: '学院一' }]),
+    tables: { c1: collegeTable('甲') },
+  })
+  await withApp(client, async (app) => {
+    const started = await app.inject({
+      method: 'POST',
+      url: '/api/sync/start',
+      payload: { semesterCode: SEMESTER, username: 'user', password: 'secret-password' },
+    })
+    const jobId = started.json().jobId as string
+    const progress = await waitUntilSettled(app, jobId)
+    assert.equal(progress.status, 'DONE')
+    assert.equal(progress.teacherCount, 1)
+    const job = peekSyncJob(jobId)
+    assert.ok(job)
+    assert.equal('password' in job, false)
+    assert.equal(JSON.stringify(job).includes('secret-password'), false)
   })
 })
 

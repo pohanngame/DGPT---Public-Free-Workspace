@@ -86,13 +86,16 @@ export function replaceSemester(db: DatabaseSync, input: SemesterImport): void {
       pinyin_initials = excluded.pinyin_initials,
       updated_at = excluded.updated_at
   `)
-  const deleteTeacherCollegesForSemester = db.prepare(`
+  const listSemesterTeacherNames = db.prepare(
+    'SELECT DISTINCT teacher_name FROM semester_teachers WHERE semester_code = ?',
+  )
+  const deleteUnusedTeacherCollege = db.prepare(`
     DELETE FROM teacher_colleges
     WHERE teacher_name = ?
-      AND college_code NOT IN (
-        SELECT college_code
-        FROM semester_teachers
-        WHERE teacher_name = ? AND semester_code != ?
+      AND NOT EXISTS (
+        SELECT 1 FROM semester_teachers
+        WHERE teacher_name = teacher_colleges.teacher_name
+          AND college_code = teacher_colleges.college_code
       )
   `)
   const insertTeacherCollege = db.prepare(`
@@ -112,6 +115,9 @@ export function replaceSemester(db: DatabaseSync, input: SemesterImport): void {
   `)
 
   const updatedAt = new Date().toISOString()
+  const previousNames = (
+    listSemesterTeacherNames.all(input.semesterCode) as { teacher_name: string }[]
+  ).map((row) => row.teacher_name)
   db.exec('BEGIN')
   try {
     upsertSemester.run(input.semesterCode, input.semesterCode)
@@ -120,7 +126,6 @@ export function replaceSemester(db: DatabaseSync, input: SemesterImport): void {
     }
     for (const teacher of input.teachers) {
       upsertTeacher.run(teacher.name, pinyinInitials(teacher.name), updatedAt)
-      deleteTeacherCollegesForSemester.run(teacher.name, teacher.name, input.semesterCode)
       for (const collegeCode of teacher.collegeCodes) {
         insertTeacherCollege.run(teacher.name, collegeCode)
       }
@@ -143,6 +148,7 @@ export function replaceSemester(db: DatabaseSync, input: SemesterImport): void {
         )
       }
     }
+    for (const name of previousNames) deleteUnusedTeacherCollege.run(name)
     db.exec('COMMIT')
   } catch (error) {
     db.exec('ROLLBACK')

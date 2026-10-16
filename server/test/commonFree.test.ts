@@ -186,6 +186,55 @@ test('replaceSemester keeps both college links for one teacher', () => {
   })
 })
 
+test('replaceSemester drops a college link when the teacher leaves the only semester that used it', () => {
+  withDb((db) => {
+    replaceSemester(db, {
+      semesterCode: 'S1',
+      colleges: [
+        { code: 'A', name: '学院A', shortCode: null },
+        { code: 'B', name: '学院B', shortCode: null },
+      ],
+      teachers: [teacher('张三', ['B'])],
+    })
+    replaceSemester(db, {
+      semesterCode: 'S1',
+      colleges: [{ code: 'A', name: '学院A', shortCode: null }],
+      teachers: [teacher('李四', ['A'])],
+    })
+    const leftover = db
+      .prepare('SELECT college_code FROM teacher_colleges WHERE teacher_name = ?')
+      .all('张三') as { college_code: string }[]
+    assert.deepEqual(leftover, [])
+  })
+})
+
+test('replaceSemester keeps a college link when another semester still lists the teacher there', () => {
+  withDb((db) => {
+    replaceSemester(db, {
+      semesterCode: 'S2',
+      colleges: [{ code: 'B', name: '学院B', shortCode: null }],
+      teachers: [teacher('张三', ['B'])],
+    })
+    replaceSemester(db, {
+      semesterCode: 'S1',
+      colleges: [{ code: 'B', name: '学院B', shortCode: null }],
+      teachers: [teacher('张三', ['B'])],
+    })
+    replaceSemester(db, {
+      semesterCode: 'S1',
+      colleges: [{ code: 'A', name: '学院A', shortCode: null }],
+      teachers: [teacher('李四', ['A'])],
+    })
+    const kept = db
+      .prepare('SELECT college_code FROM teacher_colleges WHERE teacher_name = ?')
+      .all('张三') as { college_code: string }[]
+    assert.deepEqual(
+      kept.map((row) => row.college_code),
+      ['B'],
+    )
+  })
+})
+
 test('replaceSemester keeps college links still used by another semester', () => {
   withDb((db) => {
     const s1 = 'S1'

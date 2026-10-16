@@ -35,7 +35,7 @@ interface ActiveJob {
   jobId: string
   semesterCode: string
   username: string
-  password: string
+  password?: string
   status: SyncProgress['status']
   finishedColleges: number
   totalColleges: number
@@ -55,6 +55,10 @@ let active: ActiveJob | null = null
 export function resetSyncJobs(): void {
   jobs.clear()
   active = null
+}
+
+export function peekSyncJob(jobId: string): ActiveJob | undefined {
+  return jobs.get(jobId)
 }
 
 export async function startSync(db: DatabaseSync, client: JwClient, input: SyncStartInput): Promise<SyncState> {
@@ -110,7 +114,7 @@ export function getSync(jobId: string): SyncProgress {
 
 async function runLogin(db: DatabaseSync, client: JwClient, job: ActiveJob): Promise<SyncState> {
   try {
-    const login = await client.login(job.username, job.password)
+    const login = await client.login(job.username, job.password ?? '')
     if (login !== 'OK') {
       holdForSlider(job, login)
       return stateOf(job)
@@ -192,6 +196,7 @@ async function fetchTables(db: DatabaseSync, client: JwClient, job: ActiveJob): 
     job.currentCollege = null
     job.status = 'DONE'
     job.message = null
+    delete job.password
     if (active === job) active = null
   } catch (error) {
     if (job.currentCollege && job.failedColleges.length === 0) job.failedColleges = [job.currentCollege]
@@ -203,6 +208,7 @@ function fail(job: ActiveJob, message: string): void {
   if (job.status !== 'RUNNING') return
   job.status = 'FAILED'
   job.message = message
+  delete job.password
   job.awaitingSlider = false
   job.currentCollege = null
   if (active === job) active = null

@@ -33,6 +33,25 @@ async function readBody(req: IncomingMessage): Promise<string> {
 }
 
 
+test('a fetch that never responds rejects with a timeout and no password', { timeout: 2000 }, async () => {
+  const hanging = await listen(() => {})
+  try {
+    const client = createJwClient({
+      casBaseUrl: hanging.origin,
+      jwBaseUrl: 'http://127.0.0.1:1',
+      timeoutMs: 50,
+    })
+    await assert.rejects(client.login('user', 'pw-secret'), (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.match(error.message, /timeout/i)
+      assert.equal(error.message.includes('pw-secret'), false)
+      return true
+    })
+  } finally {
+    await hanging.close()
+  }
+})
+
 test('login posts the cipher form and then requests sso.jsp', async () => {
   const seen: { path: string; body: string }[] = []
   const cas = await listen(async (req, res, url) => {

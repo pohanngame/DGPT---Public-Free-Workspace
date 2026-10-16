@@ -7,6 +7,7 @@ export interface JwClientOptions {
   casBaseUrl?: string
   jwBaseUrl?: string
   sliderRandom?: (length: number) => string
+  timeoutMs?: number
 }
 
 interface StoredCookie {
@@ -19,13 +20,14 @@ interface StoredCookie {
 export function createJwClient(options: JwClientOptions = {}): JwClient {
   const cookies: StoredCookie[] = []
   let sliderKey = ''
+  const timeoutMs = options.timeoutMs ?? 20_000
   const casBase = () => trimSlash(options.casBaseUrl ?? process.env.JW_BASE_URL ?? 'https://authserver.dgpt.edu.cn')
   const jwBase = () => trimSlash(options.jwBaseUrl ?? process.env.JW_JW_BASE_URL ?? 'https://jw.dgpt.edu.cn')
 
   return {
     async login(username, password) {
       const loginUrl = `${casBase()}/authserver/login`
-      const opened = await send(cookies, loginUrl)
+      const opened = await send(cookies, loginUrl, { timeoutMs })
       if (opened.status !== 200) throw httpError(opened.status)
       const html = await opened.text()
       const form = findLoginForm(html)
@@ -35,10 +37,10 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
       const inputs = hiddenInputs(form)
 
       const checkUrl = `${casBase()}/authserver/checkNeedCaptcha.htl?username=${encodeURIComponent(username)}`
-      const check = await send(cookies, checkUrl)
+      const check = await send(cookies, checkUrl, { timeoutMs })
       const checkBody = (await check.text()).trim()
       if (captchaRequired(checkBody)) {
-        return openSlider(cookies, casBase(), (key) => {
+        return openSlider(cookies, casBase(), timeoutMs, (key) => {
           sliderKey = key
         })
       }
@@ -52,7 +54,7 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
         cllt: 'userNameLogin',
         dllt: 'generalLogin',
       })
-      const posted = await send(cookies, loginUrl, { method: 'POST', body, referer: loginUrl })
+      const posted = await send(cookies, loginUrl, { method: 'POST', body, referer: loginUrl, timeoutMs })
       const location = posted.headers.get('location')
       if (location?.includes('error')) throw new Error('credentials rejected')
       let chain = `${jwBase()}/jsxsd/sso.jsp`
@@ -63,9 +65,9 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
       } else {
         await posted.text()
       }
-      const landed = await follow(cookies, chain)
+      const landed = await follow(cookies, chain, timeoutMs)
       if (!new URL(landed.url).pathname.startsWith('/jsxsd/')) {
-        await follow(cookies, `${jwBase()}/jsxsd/sso.jsp`)
+        await follow(cookies, `${jwBase()}/jsxsd/sso.jsp`, timeoutMs)
       }
       return 'OK'
     },
@@ -79,7 +81,12 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
         tracks: move.tracks,
       })
       const body = new URLSearchParams({ sign: encryptPassword(payload, sliderKey, options.sliderRandom) })
-      const response = await send(cookies, url, { method: 'POST', body, referer: `${casBase()}/authserver/login` })
+      const response = await send(cookies, url, {
+        method: 'POST',
+        body,
+        referer: `${casBase()}/authserver/login`,
+        timeoutMs,
+      })
       if (response.status !== 200) throw httpError(response.status)
       const json = (await response.json()) as { errorCode?: number; errorMsg?: string; message?: string }
       if (json.errorCode === 1) return 'OK'
@@ -87,7 +94,7 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
     },
 
     async fetchTeacherPage() {
-      const response = await send(cookies, `${jwBase()}/jsxsd/kbcx/kbxx_teacher`)
+      const response = await send(cookies, `${jwBase()}/jsxsd/kbcx/kbxx_teacher`, { timeoutMs })
       if (response.status !== 200) throw httpError(response.status)
       return response.text()
     },
@@ -111,6 +118,7 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
         method: 'POST',
         body,
         referer: `${jwBase()}/jsxsd/kbcx/kbxx_teacher`,
+        timeoutMs,
       })
       if (response.status !== 200) throw httpError(response.status)
       return response.text()
@@ -118,9 +126,14 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
   }
 }
 
-async function openSlider(cookies: StoredCookie[], casBase: string, remember: (key: string) => void) {
+async function openSlider(
+  cookies: StoredCookie[],
+  casBase: string,
+  timeoutMs: number,
+  remember: (key: string) => void,
+) {
   const url = `${casBase}/authserver/common/openSliderCaptcha.htl?ts=${Date.now()}`
-  const response = await send(cookies, url)
+  const response = await send(cookies, url, { timeoutMs })
   if (response.status !== 200) throw httpError(response.status)
   const json = (await response.json()) as {
     bigImage?: string
@@ -156,11 +169,15 @@ function aesKey(salt: string, piece: string): string {
   return decoded.subarray(decoded.length - 16).toString('latin1')
 }
 
-async function follow(cookies: StoredCookie[], start: string): Promise<{ url: string; status: number }> {
+async function follow(
+  cookies: StoredCookie[],
+  start: string,
+  timeoutMs: number,
+): Promise<{ url: string; status: number }> {
   let url = start
   let previous: string | null = null
   for (let hop = 0; hop <= 10; hop++) {
-    const response = await send(cookies, url)
+    const response = await send(cookies, url, { timeoutMs })
     const location = response.headers.get('location')
     let next: string | null = null
     if (isRedirect(response.status) && location) {
@@ -182,7 +199,7 @@ async function follow(cookies: StoredCookie[], start: string): Promise<{ url: st
 async function send(
   cookies: StoredCookie[],
   url: string,
-  init: { method?: string; body?: URLSearchParams; referer?: string } = {},
+  init: { method?: string; body?: URLSearchParams; referer?: string; timeoutMs?: number } = {},
 ): Promise<Response> {
   assertAllowedHost(url)
   const headers: Record<string, string> = { 'User-Agent': UA }
@@ -190,14 +207,20 @@ async function send(
   if (cookie) headers.Cookie = cookie
   if (init.referer) headers.Referer = init.referer
   if (init.body) headers['Content-Type'] = 'application/x-www-form-urlencoded'
-  const response = await fetch(url, {
-    method: init.method ?? 'GET',
-    headers,
-    body: init.body,
-    redirect: 'manual',
-  })
-  absorb(cookies, response)
-  return response
+  try {
+    const response = await fetch(url, {
+      method: init.method ?? 'GET',
+      headers,
+      body: init.body,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(init.timeoutMs ?? 20_000),
+    })
+    absorb(cookies, response)
+    return response
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') throw new Error('request timeout')
+    throw error
+  }
 }
 
 function absorb(cookies: StoredCookie[], response: Response): void {
