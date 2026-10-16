@@ -149,10 +149,11 @@ test('POST /api/common-free with an empty teacher list returns 422 VALIDATION_ER
   })
 })
 
-test('sync routes are not registered', async () => {
+test('sync start without a client returns 500 and does not replace catalog routes', async () => {
   await withApp(async (app) => {
     const response = await app.inject({ method: 'POST', url: '/api/sync/start', payload: {} })
-    assert.equal(response.statusCode, 404)
+    assert.equal(response.statusCode, 500)
+    assert.equal(response.json().error.code, 'INTERNAL')
   })
 })
 

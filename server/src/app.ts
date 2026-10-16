@@ -13,7 +13,8 @@ import {
   updateSettings,
 } from './catalog.ts'
 import { queryCommonFree } from './commonFree.ts'
-import type { CommonFreeQuery } from './contract.ts'
+import type { CommonFreeQuery, SliderSubmitRequest } from './contract.ts'
+import { getSync, startSync, submitSlider, type JwClient } from './sync.ts'
 
 interface ErrorBody {
   error: {
@@ -44,6 +45,7 @@ function detailsOf(error: unknown): unknown {
 
 export interface BuildAppOptions {
   now?: () => Date
+  jwClient?: JwClient
 }
 
 export function buildApp(db: DatabaseSync, options: BuildAppOptions = {}): FastifyInstance {
@@ -136,5 +138,88 @@ export function buildApp(db: DatabaseSync, options: BuildAppOptions = {}): Fasti
     })
   })
 
+  app.post<{
+    Body: { semesterCode?: unknown; username?: unknown; password?: unknown }
+  }>('/api/sync/start', async (request, reply) => {
+    const client = options.jwClient
+    if (!client) {
+      return reply.code(500).send(errorBody('INTERNAL', 'sync client is not configured'))
+    }
+    const body = request.body ?? {}
+    if (typeof body.semesterCode !== 'string' || body.semesterCode.length === 0) {
+      return reply.code(422).send(errorBody('VALIDATION_ERROR', 'semesterCode is required'))
+    }
+    const username = stringOrEnv(body.username, 'JW_USERNAME')
+    const password = stringOrEnv(body.password, 'JW_PASSWORD')
+    if (!username || !password) {
+      return reply.code(422).send(errorBody('VALIDATION_ERROR', 'username and password are required'))
+    }
+    return startSync(db, client, { semesterCode: body.semesterCode, username, password })
+  })
+
+  app.post<{
+    Body: { jobId?: unknown; canvasWidth?: unknown; move?: unknown; tracks?: unknown }
+  }>('/api/sync/slider', async (request, reply) => {
+    const client = options.jwClient
+    if (!client) {
+      return reply.code(500).send(errorBody('INTERNAL', 'sync client is not configured'))
+    }
+    const body = request.body ?? {}
+    if (typeof body.jobId !== 'string' || !isSliderMove(body)) {
+      return reply.code(422).send(errorBody('VALIDATION_ERROR', 'jobId, canvasWidth, move, and tracks are required'))
+    }
+    try {
+      return submitSlider(db, client, body.jobId, sliderMove(body))
+    } catch (error) {
+      if (codeOf(error) === 'CONFLICT') {
+        const message = error instanceof Error ? error.message : 'conflict'
+        return reply.code(409).send(errorBody('CONFLICT', message))
+      }
+      throw error
+    }
+  })
+
+  app.get<{ Params: { jobId: string } }>('/api/sync/:jobId', async (request, reply) => {
+    try {
+      return getSync(request.params.jobId)
+    } catch (error) {
+      if (codeOf(error) === 'NOT_FOUND') {
+        return reply.code(404).send(errorBody('NOT_FOUND', 'sync job not found'))
+      }
+      throw error
+    }
+  })
+
   return app
+}
+
+function stringOrEnv(value: unknown, envName: 'JW_USERNAME' | 'JW_PASSWORD'): string | undefined {
+  if (typeof value === 'string' && value.length > 0) return value
+  const fromEnv = process.env[envName]
+  return fromEnv && fromEnv.length > 0 ? fromEnv : undefined
+}
+
+function isSliderMove(body: { canvasWidth?: unknown; move?: unknown; tracks?: unknown }): boolean {
+  return typeof body.canvasWidth === 'number' && typeof body.move === 'number' && isTrackList(body.tracks)
+}
+
+function sliderMove(body: { canvasWidth?: unknown; move?: unknown; tracks?: unknown }): SliderSubmitRequest {
+  if (typeof body.canvasWidth !== 'number' || typeof body.move !== 'number' || !isTrackList(body.tracks)) {
+    throw new Error('slider move is invalid')
+  }
+  return { canvasWidth: body.canvasWidth, move: body.move, tracks: body.tracks }
+}
+
+function isTrackList(tracks: unknown): tracks is SliderSubmitRequest['tracks'] {
+  return (
+    Array.isArray(tracks) &&
+    tracks.every(
+      (point) =>
+        typeof point === 'object' &&
+        point !== null &&
+        typeof (point as { a?: unknown }).a === 'number' &&
+        typeof (point as { b?: unknown }).b === 'number' &&
+        typeof (point as { c?: unknown }).c === 'number',
+    )
+  )
 }
