@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
+
+import { deflateSync } from 'node:zlib'
 import { test } from 'node:test'
 import { createJwClient } from '../src/jw/client.ts'
 import { encryptPassword } from '../src/jw/cipher.ts'
@@ -173,7 +175,7 @@ test('submitSlider posts only sign and reports a rejected verify', async () => {
     }
     if (url.pathname === '/authserver/common/openSliderCaptcha.htl') {
       res.setHeader('content-type', 'application/json')
-      res.end(JSON.stringify({ bigImage: 'bg64', smallImage: piece, y: 12, sign: 'sig-1' }))
+      res.end(JSON.stringify({ bigImage: png(8, 3, (x) => x === 5), smallImage: png(3, 3, (x) => x === 1), y: 0, sign: 'sig-1', salt: pieceKey }))
       return
     }
     if (url.pathname !== '/authserver/common/verifySliderCaptcha.htl') {
@@ -183,12 +185,12 @@ test('submitSlider posts only sign and reports a rejected verify', async () => {
     }
     bodies.push(await readBody(req))
     res.setHeader('content-type', 'application/json')
-    res.end(JSON.stringify(bodies.length === 1 ? { errorCode: 1 } : { errorCode: 0, errorMsg: 'off' }))
+    res.end(JSON.stringify({ errorCode: bodies.length === 1 ? 1 : 0, errorMsg: 'off' }))
   })
   try {
     const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: 'http://127.0.0.1:1' })
-    const opened = await client.login('user', 'pw')
-    assert.notEqual(opened, 'OK')
+    const login = await client.login('user', 'pw')
+    assert.equal(typeof login === 'object' && login.code, 'NEED_SLIDER')
     const move = { canvasWidth: 280, move: 40, tracks: [{ a: 1, b: 2, c: 3 }] }
     assert.equal(await client.submitSlider('job', move), 'OK')
     assert.deepEqual(await client.submitSlider('job', move), { code: 'SLIDER_FAILED', message: 'off' })
@@ -207,6 +209,7 @@ test('submitSlider posts only sign and reports a rejected verify', async () => {
 test('slider sign uses a 16-byte salt when safeSecure is present but not 16 bytes', async () => {
   const salt = '0123456789abcdef'
   let body = ''
+  let verifies = 0
   const cas = await listen(async (req, res, url) => {
     if (url.pathname === '/authserver/login' && req.method === 'GET') {
       res.end(casForm())
@@ -218,10 +221,11 @@ test('slider sign uses a 16-byte salt when safeSecure is present but not 16 byte
     }
     if (url.pathname === '/authserver/common/openSliderCaptcha.htl') {
       res.setHeader('content-type', 'application/json')
-      res.end(JSON.stringify({ safeSecure: 'short', salt, smallImage: 'not-used', y: 1, sign: 'sig' }))
+      res.end(JSON.stringify({ safeSecure: 'short', salt, bigImage: png(8, 3, (x) => x === 5), smallImage: png(3, 3, (x) => x === 1), y: 0, sign: 'sig' }))
       return
     }
     if (url.pathname === '/authserver/common/verifySliderCaptcha.htl') {
+      verifies += 1
       body = await readBody(req)
       res.setHeader('content-type', 'application/json')
       res.end(JSON.stringify({ errorCode: 1 }))
@@ -237,8 +241,8 @@ test('slider sign uses a 16-byte salt when safeSecure is present but not 16 byte
       jwBaseUrl: 'http://127.0.0.1:1',
       sliderRandom: fixedRandom,
     })
-    const opened = await client.login('user', 'pw')
-    assert.notEqual(opened, 'OK')
+    const login = await client.login('user', 'pw')
+    assert.equal(typeof login === 'object' && login.code, 'NEED_SLIDER')
     const move = { canvasWidth: 280, move: 40, tracks: [{ a: 1, b: 2, c: 3 }] }
     assert.equal(await client.submitSlider('job', move), 'OK')
     assert.notEqual(Buffer.byteLength('short'), 16)
@@ -534,9 +538,54 @@ test('a saved cookie jar skips the login page on the next sync', async () => {
   }
 })
 
-test('slider-required login returns NEED_SLIDER and does not submit a move', async () => {
-  const posts: string[] = []
-  const cas = await listen(async (req, res, url) => {
+function png(width: number, height: number, opaque: (x: number, y: number) => boolean): string {
+  const raw = Buffer.alloc((1 + width * 4) * height)
+  for (let y = 0; y < height; y++) {
+    const row = y * (1 + width * 4)
+    for (let x = 0; x < width; x++) {
+      const i = row + 1 + x * 4
+      const on = opaque(x, y)
+      raw[i] = on ? 40 : 200
+      raw[i + 1] = on ? 40 : 200
+      raw[i + 2] = on ? 40 : 200
+      raw[i + 3] = on ? 255 : 0
+    }
+  }
+  const chunk = (type: string, data: Buffer) => {
+    const out = Buffer.alloc(12 + data.length)
+    out.writeUInt32BE(data.length, 0)
+    out.write(type, 4, 4, 'ascii')
+    data.copy(out, 8)
+    const crc32 = (buf: Buffer) => {
+      let c = ~0
+      for (const byte of buf) {
+        c ^= byte
+        for (let bit = 0; bit < 8; bit++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1))
+      }
+      return ~c >>> 0
+    }
+    out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length)
+    return out
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(height, 4)
+  ihdr[8] = 8
+  ihdr[9] = 6
+  const file = Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+  return file.toString('base64')
+}
+
+test('slider-required login returns the images and does not verify them', async () => {
+  const bg = png(8, 3, (x) => x === 5)
+  const piece = png(3, 3, (x) => x === 1)
+  let verifies = 0
+  const cas = await listen((req, res, url) => {
     if (url.pathname === '/authserver/login' && req.method === 'GET') {
       res.end(casForm())
       return
@@ -547,22 +596,19 @@ test('slider-required login returns NEED_SLIDER and does not submit a move', asy
     }
     if (url.pathname === '/authserver/common/openSliderCaptcha.htl') {
       res.setHeader('content-type', 'application/json')
-      res.end(JSON.stringify({ bigImage: 'bg64', smallImage: 'piece64', y: 12, sign: 'sig-1' }))
+      res.end(JSON.stringify({ bigImage: bg, smallImage: piece, y: 0, sign: 'sig-1', salt: SALT }))
       return
     }
-    if (req.method === 'POST') {
-      posts.push(url.pathname)
-      res.end('{}')
-      return
-    }
+    if (url.pathname === '/authserver/common/verifySliderCaptcha.htl') verifies += 1
     res.writeHead(404)
     res.end()
   })
   try {
     const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: 'http://127.0.0.1:1' })
-    const result = await client.login('user', 'pw')
-    assert.deepEqual(result, { code: 'NEED_SLIDER', sign: 'sig-1', bg: 'bg64', piece: 'piece64', y: 12 })
-    assert.deepEqual(posts, [])
+    const login = await client.login('user', 'pw')
+    assert.equal(typeof login === 'object' && login.code, 'NEED_SLIDER')
+    if (typeof login === 'object') assert.equal(login.bg, bg)
+    assert.equal(verifies, 0)
   } finally {
     await cas.close()
   }

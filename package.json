@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "fastify": "^5.12.7",
+    "jpeg-js": "0.4.4",
     "vue": "^3.5.44"
   }
 }
