@@ -30,6 +30,16 @@ test('week text (2-13周) occupies weeks 2 through 13', () => {
   assert.equal(teachers[0]?.cells[0]?.slotCode, '0102')
 })
 
+test('a 2023 table with five slots per day keeps the friday class', () => {
+  const html = readFileSync(new URL('../../probe/out/old-semester-table.html', import.meta.url), 'utf8')
+  const teachers = parseTeacherTable(html)
+  const teacher = teachers.find((item) => item.name === '李龙根')
+  assert.ok(teachers.length > 1)
+  assert.equal(teacher?.cells.length, 1)
+  assert.equal(teacher?.cells[0]?.dayOfWeek, 5)
+  assert.equal(teacher?.cells[0]?.slotCode, '0102')
+})
+
 test('occupancy without week text occupies weeks 1 through 30', () => {
   const teachers = parseTeacherTable(teacherRow('测试', '实验课占位'))
   assert.equal(teachers.length, 1)

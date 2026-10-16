@@ -1,10 +1,8 @@
 import { SLOT_CODES } from '../contract.ts'
 
-/** 一位教师的整行 td 数：1 列姓名 + 7 天 × 6 节次组。 */
-const COLUMNS_PER_TEACHER_ROW = 43
-
 /** 表头占前两行：第 1 行星期、第 2 行节次组。 */
 const HEADER_ROWS = 2
+const DAYS_PER_WEEK = 7
 
 const TABLE_PATTERN =
   /<table[^>]*id=["']?kbtable["']?[^>]*>(.*?)<\/table>/is
@@ -38,14 +36,11 @@ export function parseTeacherTable(html: string): ParsedTeacherRow[] {
   if (!table?.[1]) {
     return []
   }
+  const rows = [...table[1].matchAll(ROW_PATTERN)]
+  const slotCodes = slotCodesFromHeader(rows[1]?.[1] ?? '')
   const teachers: ParsedTeacherRow[] = []
-  let rowIndex = -1
-  for (const row of table[1].matchAll(ROW_PATTERN)) {
-    rowIndex++
-    if (rowIndex < HEADER_ROWS) {
-      continue
-    }
-    const parsed = parseRow(row[1] ?? '')
+  for (const row of rows.slice(HEADER_ROWS)) {
+    const parsed = parseRow(row[1] ?? '', slotCodes)
     if (parsed) {
       teachers.push(parsed)
     }
@@ -53,9 +48,22 @@ export function parseTeacherTable(html: string): ParsedTeacherRow[] {
   return teachers
 }
 
-function parseRow(rowHtml: string): ParsedTeacherRow | null {
+/** 第 2 行表头给出每天的节次。旧学期没有 1112，不能按固定 43 列计算。 */
+function slotCodesFromHeader(headerHtml: string): string[] {
+  const labels = [...headerHtml.matchAll(/<t[dh][^>]*>(.*?)<\/t[dh]>/gis)]
+    .map((match) => toPlainText(match[1] ?? ''))
+    .filter((label) => SLOT_CODES.includes(label as (typeof SLOT_CODES)[number]))
+  const perDay = labels.length / DAYS_PER_WEEK
+  if (labels.length > 0 && perDay === Math.floor(perDay) && labels.slice(0, perDay).every((label, index) => label === SLOT_CODES[index])) {
+    return labels.slice(0, perDay)
+  }
+  return [...SLOT_CODES]
+}
+
+function parseRow(rowHtml: string, slotCodes: readonly string[]): ParsedTeacherRow | null {
   const cells = [...rowHtml.matchAll(CELL_PATTERN)].map((match) => match[1] ?? '')
-  if (cells.length !== COLUMNS_PER_TEACHER_ROW) {
+  const expected = 1 + DAYS_PER_WEEK * slotCodes.length
+  if (cells.length !== expected) {
     return null
   }
   const name = extractTeacherName(cells[0] ?? '')
@@ -63,14 +71,14 @@ function parseRow(rowHtml: string): ParsedTeacherRow | null {
     return null
   }
   const occupancies: ParsedCell[] = []
-  // 第 1 列是姓名，其后 42 列：列号 1..42 -> 天 = floor((列-1)/6)+1。
-  for (let column = 1; column < COLUMNS_PER_TEACHER_ROW; column++) {
+  // 第 1 列是姓名，其后按天和表头节次排列。
+  for (let column = 1; column < cells.length; column++) {
     const occupancyText = toPlainText(cells[column] ?? '')
     if (!occupancyText) {
       continue
     }
-    const dayOfWeek = Math.floor((column - 1) / SLOT_CODES.length) + 1
-    const slotCode = SLOT_CODES[(column - 1) % SLOT_CODES.length] ?? ''
+    const dayOfWeek = Math.floor((column - 1) / slotCodes.length) + 1
+    const slotCode = slotCodes[(column - 1) % slotCodes.length] ?? ''
     const [weekStart, weekEnd] = extractWeekRange(occupancyText)
     occupancies.push({ dayOfWeek, slotCode, weekStart, weekEnd, occupancyText })
   }
