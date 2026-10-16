@@ -1,0 +1,1134 @@
+
+
+  
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+
+<head id="headerid1">
+	<base target='_self'>
+	<title>全校教师课表</title>	
+	<meta http-equiv="pragma" content="no-cache">
+	<meta http-equiv="cache-control" content="no-cache">
+	<meta http-equiv="expires" content="0">
+	<meta http-equiv="keywords" content="湖南强智科技教务系统">
+	<meta http-equiv="description" content="湖南强智科技教务系统">
+	<meta http-equiv="X-UA-Compatible" content="IE=EmulateIE8" />
+<script type="text/javascript" src="/jsxsd/js/jquery-min.js" language="javascript" ></script>
+<script type="text/javascript" src="/jsxsd/js/common.js" language="javascript" ></script>
+<script type="text/javascript" src="/jsxsd/js/iepngfix_tilebg.js" language="javascript" ></script>
+<script type="text/javascript" src="/jsxsd/js/easyui/jquery.easyui.min.js" language="javascript" ></script>
+<script type="text/javascript" src="/jsxsd/js/jquery.autocomplete.min.js" language="javascript" ></script>
+<link href="/jsxsd/framework/images/common.css" rel="stylesheet" type="text/css" />
+<link href="/jsxsd/framework/images/blue.css" rel="stylesheet" type="text/css" id="link_theme" />
+<link href="/jsxsd/framework/images/workstation.css" rel="stylesheet" type="text/css" /> 
+<link href="/jsxsd/css/easyui.css" rel="stylesheet" type="text/css" />
+<link href="/jsxsd/css/jquery.autocomplete.css" rel="stylesheet" type="text/css" />
+</head>
+<iframe id="notSession" name="notSession" style="display: none;" src=""></iframe>
+<script type="text/javascript">
+jQuery(document).ready(function(){
+	window.setInterval(function(){
+		 document.getElementById("notSession").src = "/jsxsd/framework/blankPage.jsp";
+	 }, 1000 * 60 * 10);
+});
+</script>
+<body>
+ 
+<iframe style="display:none;" name="ifrmPrint" id="ifrmPrint"></iframe>
+<form action="" name="FormPrint" id="FormPrint" method="post" target="ifrmPrint">
+</form>
+<div class="Nsb_pw">    
+
+
+
+
+
+
+
+ 
+	<div class="Nsb_layout_r">
+	<div class="Nsb_layout_r title">教师课表</div>
+ <form action="/jsxsd/kbcx/kbxx_teacher_ifr" name="Form1" id="Form1" method="post" target="fcenter">
+        <div>
+		学年学期：<select name="xnxqh" id="xnxqh" 　style="width:100px;" onchange="initJc(this);sfxszc(this);">
+		
+		<option value="2029-2030-2"  >2029-2030-2</option>
+		
+		<option value="2029-2030-1"  >2029-2030-1</option>
+		
+		<option value="2028-2029-2"  >2028-2029-2</option>
+		
+		<option value="2028-2029-1"  >2028-2029-1</option>
+		
+		<option value="2027-2028-2"  >2027-2028-2</option>
+		
+		<option value="2027-2028-1"  >2027-2028-1</option>
+		
+		<option value="2026-2027-2"  >2026-2027-2</option>
+		
+		<option value="2026-2027-1"   selected="selected">2026-2027-1</option>
+		
+		<option value="2025-2026-2"  >2025-2026-2</option>
+		
+		<option value="2025-2026-1"  >2025-2026-1</option>
+		
+		<option value="2024-2025-2"  >2024-2025-2</option>
+		
+		<option value="2024-2025-1"  >2024-2025-1</option>
+		
+		<option value="2023-2024-2"  >2023-2024-2</option>
+		
+		<option value="2023-2024-1"  >2023-2024-1</option>
+		
+		<option value="2022-2023-2"  >2022-2023-2</option>
+		
+		<option value="2022-2023-1"  >2022-2023-1</option>
+		
+		<option value="2021-2022-2"  >2021-2022-2</option>
+		
+		<option value="2021-2022-1"  >2021-2022-1</option>
+		
+		<option value="2020-2021-2"  >2020-2021-2</option>
+		
+		<option value="2020-2021-1"  >2020-2021-1</option>
+		
+		<option value="2019-2020-2"  >2019-2020-2</option>
+		
+		<option value="2019-2020-1"  >2019-2020-1</option>
+		
+		<option value="2018-2019-2"  >2018-2019-2</option>
+		
+		<option value="2018-2019-1"  >2018-2019-1</option>
+		
+		<option value="2017-2018-2"  >2017-2018-2</option>
+		
+		<option value="2017-2018-1"  >2017-2018-1</option>
+		
+		<option value="2016-2017-2"  >2016-2017-2</option>
+		
+		<option value="2016-2017-1"  >2016-2017-1</option>
+		
+		<option value="2011-2012-1"  >2011-2012-1</option>
+		
+		</select>&nbsp;
+		时间模式：<select name="kbjcmsid" id="kbjcmsid" style="width: 120px;">
+		
+			<option value="947A14DB0EE37B4EE0530100007FD241" >默认节次模式</option>
+		
+		</select>
+		上课院系:<select id="skyx" name="skyx" style="width: 90px;" onchange="onchangeYxOrKsnd(this)">
+		<option value="">-请选择-</option>
+		
+			<option value="FEC49F5C26EC4B3CAFE5FC5CD66B05B6" >[0012]智能制造学院</option>
+		
+			<option value="AA5A05A1F91C4C428D6B864263278FC0" >[0013]电子信息学院</option>
+		
+			<option value="ED38070CD0264C709DB383198D487D38" >[0014]人工智能学院</option>
+		
+			<option value="CD65FD90C2B74A25B8C4D1DB101FD49D" >[0017]创意设计学院</option>
+		
+			<option value="12BFCD019C944018B2DBACE73B4878B3" >[0018]数字媒体学院</option>
+		
+			<option value="79B6D3E788704D71A557D503FAB6EDA2" >[0022]马克思主义学院</option>
+		
+			<option value="9783DA3013AE4B1BB2944A8DBB6D222C" >[0044]卫生健康学院</option>
+		
+			<option value="63895D7EB97D4A71AEA724F067432333" >[0045]国际交流学院（外事与台港澳事务办公室）</option>
+		
+			<option value="0100" >[0100]商学院（筹）</option>
+		
+			<option value="0101" >[0101]创意设计与传媒学院（筹）</option>
+		
+			<option value="0102" >[0102]教育与体育学院（筹）</option>
+		
+			<option value="0104" >[0104]通识学院（筹）</option>
+		
+			<option value="5271A7005629438B9E7659CA37913DFB" >[45]校外教学点</option>
+		
+		</select>&nbsp;&nbsp;
+		<font style="display:none;" id="jszcxs">
+			职称:<select id="jszc" name="jszc" style="width: 90px;" onchange="onchangeYxOrKsnd(this)"  >
+			<option value="">-请选择-</option>
+			
+				<option value="010" >高等学校教师</option>
+			
+				<option value="011" >教授</option>
+			
+				<option value="012" >副教授</option>
+			
+				<option value="013" >讲师（高校）</option>
+			
+				<option value="014" >助教（高校）</option>
+			
+				<option value="020" >中等专业学校教师</option>
+			
+				<option value="022" >高级讲师（中专）</option>
+			
+				<option value="023" >讲师（中专）</option>
+			
+				<option value="024" >助理讲师（中专）</option>
+			
+				<option value="025" >教员（中专）</option>
+			
+				<option value="030" >技工学校教师</option>
+			
+				<option value="032" >高级讲师（技校）</option>
+			
+				<option value="033" >讲师（技校）</option>
+			
+				<option value="034" >助理讲师（技校）</option>
+			
+				<option value="035" >教员（技校）</option>
+			
+				<option value="040" >技工学校教师（实习指导</option>
+			
+				<option value="042" >高级实习指导教师</option>
+			
+				<option value="043" >一级实习指导教师</option>
+			
+				<option value="044" >二级实习指导教师</option>
+			
+				<option value="045" >三级实习指导教师</option>
+			
+				<option value="050" >中学教师</option>
+			
+				<option value="052" >高级教师（中学）</option>
+			
+				<option value="053" >一级教师（中学）</option>
+			
+				<option value="054" >二级教师（中学）</option>
+			
+				<option value="055" >三级教师（中学）</option>
+			
+				<option value="070" >实验技术人员</option>
+			
+				<option value="072" >高级实验师</option>
+			
+				<option value="073" >实验师</option>
+			
+				<option value="074" >助理实验师</option>
+			
+				<option value="075" >实验员</option>
+			
+				<option value="080" >工程技术人员</option>
+			
+				<option value="082" >高级工程师</option>
+			
+				<option value="083" >工程师</option>
+			
+				<option value="084" >助理工程师</option>
+			
+				<option value="085" >技术员</option>
+			
+				<option value="090" >农业技术人员（农艺）</option>
+			
+				<option value="091" >农业技术推广研究员(农艺</option>
+			
+				<option value="092" >高级农艺师</option>
+			
+				<option value="093" >农艺师</option>
+			
+				<option value="094" >助理农艺师</option>
+			
+				<option value="095" >农业技术员</option>
+			
+				<option value="100" >农业技术人员（兽医）</option>
+			
+				<option value="101" >农业技术推广研究员(兽医</option>
+			
+				<option value="102" >高级兽医师</option>
+			
+				<option value="103" >兽医师</option>
+			
+				<option value="104" >助理兽医师</option>
+			
+				<option value="105" >兽医技术员</option>
+			
+				<option value="110" >农业技术人员（畜牧）</option>
+			
+				<option value="111" >农业技术推广研究员(畜牧</option>
+			
+				<option value="112" >高级畜牧师</option>
+			
+				<option value="113" >畜牧师</option>
+			
+				<option value="114" >助理畜牧师</option>
+			
+				<option value="115" >畜牧技术员</option>
+			
+				<option value="120" >经济专业人员</option>
+			
+				<option value="122" >高级经济师</option>
+			
+				<option value="123" >经济师</option>
+			
+				<option value="124" >助理经济师</option>
+			
+				<option value="125" >经济员</option>
+			
+				<option value="130" >会计专业人员</option>
+			
+				<option value="132" >高级会计师</option>
+			
+				<option value="133" >会计师</option>
+			
+				<option value="134" >助理会计师</option>
+			
+				<option value="135" >会计员</option>
+			
+				<option value="140" >统计专业人员</option>
+			
+				<option value="142" >高级统计师</option>
+			
+				<option value="143" >统计师</option>
+			
+				<option value="144" >助理统计师</option>
+			
+				<option value="145" >统计员</option>
+			
+				<option value="150" >出版专业人员（编审）</option>
+			
+				<option value="151" >编审</option>
+			
+				<option value="152" >副编审</option>
+			
+				<option value="153" >编辑</option>
+			
+				<option value="154" >助理编辑</option>
+			
+				<option value="160" >出版专业人员（技术编辑</option>
+			
+				<option value="163" >技术编辑</option>
+			
+				<option value="164" >助理技术编辑</option>
+			
+				<option value="165" >技术设计员</option>
+			
+				<option value="170" >出版专业人员（校对）</option>
+			
+				<option value="173" >一级校对</option>
+			
+				<option value="174" >二级校对</option>
+			
+				<option value="175" >三级校对</option>
+			
+				<option value="180" >翻译人员</option>
+			
+				<option value="181" >译审</option>
+			
+				<option value="182" >副译审</option>
+			
+				<option value="183" >翻译</option>
+			
+				<option value="184" >助理翻译</option>
+			
+				<option value="190" >新闻专业人员（记者）</option>
+			
+				<option value="191" >高级记者</option>
+			
+				<option value="192" >主任记者</option>
+			
+				<option value="193" >记者</option>
+			
+				<option value="194" >助理记者</option>
+			
+				<option value="200" >新闻专业人员（编辑）</option>
+			
+				<option value="201" >高级编辑</option>
+			
+				<option value="202" >主任编辑</option>
+			
+				<option value="203" >编辑</option>
+			
+				<option value="204" >助理编辑</option>
+			
+				<option value="220" >播音员</option>
+			
+				<option value="221" >播音指导</option>
+			
+				<option value="222" >主任播音员</option>
+			
+				<option value="223" >一级播音员</option>
+			
+				<option value="224" >二级播音员</option>
+			
+				<option value="225" >三级播音员</option>
+			
+				<option value="230" >卫生技术人员（医师）</option>
+			
+				<option value="231" >主任医师</option>
+			
+				<option value="232" >副主任医师</option>
+			
+				<option value="233" >主治医师</option>
+			
+				<option value="234" >医师</option>
+			
+				<option value="235" >医士</option>
+			
+				<option value="240" >卫生技术人员（药剂）</option>
+			
+				<option value="241" >主任药师</option>
+			
+				<option value="242" >副主任药师</option>
+			
+				<option value="243" >主管药师</option>
+			
+				<option value="244" >药师</option>
+			
+				<option value="245" >药士</option>
+			
+				<option value="250" >卫生技术人员（护理）</option>
+			
+				<option value="251" >主任护师</option>
+			
+				<option value="252" >副主任护师</option>
+			
+				<option value="253" >主管护师</option>
+			
+				<option value="254" >护师</option>
+			
+				<option value="255" >护士</option>
+			
+				<option value="260" >卫生技术人员（技师）</option>
+			
+				<option value="261" >主任技师</option>
+			
+				<option value="262" >副主任技师</option>
+			
+				<option value="263" >主管技师</option>
+			
+				<option value="264" >技师</option>
+			
+				<option value="265" >技士</option>
+			
+				<option value="270" >工艺美术人员</option>
+			
+				<option value="272" >高级工艺美术师</option>
+			
+				<option value="273" >工艺美术师</option>
+			
+				<option value="274" >助理工艺美术师</option>
+			
+				<option value="275" >工艺美术员</option>
+			
+				<option value="280" >艺术人员（演员）</option>
+			
+				<option value="281" >一级演员</option>
+			
+				<option value="282" >二级演员</option>
+			
+				<option value="283" >三级演员</option>
+			
+				<option value="284" >四级演员</option>
+			
+				<option value="290" >艺术人员（演奏员）</option>
+			
+				<option value="291" >一级演奏员</option>
+			
+				<option value="292" >二级演奏员</option>
+			
+				<option value="293" >三级演奏员</option>
+			
+				<option value="294" >四级演奏员</option>
+			
+				<option value="300" >艺术人员（编剧）</option>
+			
+				<option value="301" >一级编剧</option>
+			
+				<option value="302" >二级编剧</option>
+			
+				<option value="303" >三级编剧</option>
+			
+				<option value="304" >四级编剧</option>
+			
+				<option value="310" >艺术人员（导演）</option>
+			
+				<option value="311" >一级导演</option>
+			
+				<option value="312" >二级导演</option>
+			
+				<option value="313" >三级导演</option>
+			
+				<option value="314" >四级导演</option>
+			
+				<option value="320" >艺术人员（指挥）</option>
+			
+				<option value="321" >一级指挥</option>
+			
+				<option value="322" >二级指挥</option>
+			
+				<option value="323" >三级指挥</option>
+			
+				<option value="324" >四级指挥</option>
+			
+				<option value="330" >艺术人员（作曲）</option>
+			
+				<option value="331" >一级作曲</option>
+			
+				<option value="332" >二级作曲</option>
+			
+				<option value="333" >三级作曲</option>
+			
+				<option value="334" >四级作曲</option>
+			
+				<option value="340" >艺术人员（美术）</option>
+			
+				<option value="341" >一级美术师</option>
+			
+				<option value="342" >二级美术师</option>
+			
+				<option value="343" >三级美术师</option>
+			
+				<option value="344" >美术员</option>
+			
+				<option value="350" >艺术人员（舞美设计）</option>
+			
+				<option value="351" >一级舞美设计师</option>
+			
+				<option value="352" >二级舞美设计师</option>
+			
+				<option value="353" >三级舞美设计师</option>
+			
+				<option value="354" >舞美设计员</option>
+			
+				<option value="360" >艺术人员（舞台技术）</option>
+			
+				<option value="362" >主任舞台技师</option>
+			
+				<option value="363" >舞台技师</option>
+			
+				<option value="364" >舞台技术员</option>
+			
+				<option value="370" >体育锻炼</option>
+			
+				<option value="371" >国家级教练</option>
+			
+				<option value="372" >高级教练</option>
+			
+				<option value="373" >一级教练</option>
+			
+				<option value="374" >二级教练</option>
+			
+				<option value="375" >三级教练</option>
+			
+				<option value="390" >律师</option>
+			
+				<option value="391" >一级律师</option>
+			
+				<option value="392" >二级律师</option>
+			
+				<option value="393" >三级律师</option>
+			
+				<option value="394" >四级律师</option>
+			
+				<option value="395" >律师助理</option>
+			
+				<option value="400" >公证员</option>
+			
+				<option value="401" >一级公证员</option>
+			
+				<option value="402" >二级公证员</option>
+			
+				<option value="403" >三级公证员</option>
+			
+				<option value="404" >四级公证员</option>
+			
+				<option value="405" >公证助理员</option>
+			
+				<option value="410" >小学教师</option>
+			
+				<option value="413" >高级教师（小学）</option>
+			
+				<option value="414" >一级教师（小学）</option>
+			
+				<option value="415" >二级教师（小学）</option>
+			
+				<option value="416" >三级教师（小学）</option>
+			
+				<option value="420" >船舶技术人员（驾驶）</option>
+			
+				<option value="422" >高级船长</option>
+			
+				<option value="423" >船长（大副）</option>
+			
+				<option value="424" >二副</option>
+			
+				<option value="425" >三副</option>
+			
+				<option value="430" >船舶技术人员（轮机）</option>
+			
+				<option value="432" >高级轮机长</option>
+			
+				<option value="433" >轮机长（大管轮）</option>
+			
+				<option value="434" >二管轮</option>
+			
+				<option value="435" >三管轮</option>
+			
+				<option value="440" >船舶技术人员（电机）</option>
+			
+				<option value="442" >高级电机员</option>
+			
+				<option value="443" >通用电机员（一等电机员)</option>
+			
+				<option value="444" >二等电机员</option>
+			
+				<option value="450" >船舶技术人员（报务）</option>
+			
+				<option value="452" >高级报务员</option>
+			
+				<option value="453" >通用报务员</option>
+			
+				<option value="454" >二等报务员</option>
+			
+				<option value="455" >限用报务员</option>
+			
+				<option value="460" >飞行技术人员（驾驶）</option>
+			
+				<option value="462" >一级飞行员</option>
+			
+				<option value="463" >二级飞行员</option>
+			
+				<option value="464" >三级飞行员</option>
+			
+				<option value="465" >四级飞行员</option>
+			
+				<option value="470" >飞行技术人员（领航）</option>
+			
+				<option value="472" >一级领航员</option>
+			
+				<option value="473" >二级领航员</option>
+			
+				<option value="474" >三级领航员</option>
+			
+				<option value="475" >四级领航员</option>
+			
+				<option value="480" >飞行技术人员（通信）</option>
+			
+				<option value="482" >一级飞行通信员</option>
+			
+				<option value="483" >二级飞行通信员</option>
+			
+				<option value="484" >三级飞行通信员</option>
+			
+				<option value="485" >四级飞行通信员</option>
+			
+				<option value="490" >飞行技术人员（机械）</option>
+			
+				<option value="492" >一级飞行机械员</option>
+			
+				<option value="493" >二级飞行机械员</option>
+			
+				<option value="494" >三级飞行机械员</option>
+			
+				<option value="495" >四级飞行机械员</option>
+			
+				<option value="500" >船舶技术人员（引航）</option>
+			
+				<option value="502" >高级引航员</option>
+			
+				<option value="503" >一、二级引航员</option>
+			
+				<option value="504" >三、四级引航员</option>
+			
+				<option value="610" >自然科学研究人员</option>
+			
+				<option value="611" >研究员（自然科学）</option>
+			
+				<option value="612" >副研究员（自然科学）</option>
+			
+				<option value="613" >助理研究员（自然科学）</option>
+			
+				<option value="614" >研究实习员（自然科学）</option>
+			
+				<option value="620" >社会科学研究人员</option>
+			
+				<option value="621" >研究员（社会科学）</option>
+			
+				<option value="622" >副研究员（社会科学）</option>
+			
+				<option value="623" >助理研究员（社会科学）</option>
+			
+				<option value="624" >研究实习员（社会科学）</option>
+			
+				<option value="640" >图书、资料专业人员</option>
+			
+				<option value="641" >研究馆员（图书）</option>
+			
+				<option value="642" >副研究馆员（图书）</option>
+			
+				<option value="643" >馆员（图书）</option>
+			
+				<option value="644" >助理馆员（图书）</option>
+			
+				<option value="645" >管理员（图书）</option>
+			
+				<option value="650" >文博专业人员</option>
+			
+				<option value="651" >研究馆员（文博）</option>
+			
+				<option value="652" >副研究馆员（文博）</option>
+			
+				<option value="653" >馆员（文博）</option>
+			
+				<option value="654" >助理馆员（文博）</option>
+			
+				<option value="655" >管理员（文博）</option>
+			
+				<option value="660" >档案专业人员</option>
+			
+				<option value="661" >研究馆员（档案）</option>
+			
+				<option value="662" >副研究馆员（档案）</option>
+			
+				<option value="663" >馆员（档案）</option>
+			
+				<option value="664" >助理馆员（档案）</option>
+			
+				<option value="665" >管理员（档案）</option>
+			
+				<option value="670" >群众文化专业人员</option>
+			
+				<option value="671" >研究馆员（群众文化）</option>
+			
+				<option value="672" >副研究馆员（群众文化）</option>
+			
+				<option value="673" >馆员（群众文化）</option>
+			
+				<option value="674" >助理馆员（群众文化）</option>
+			
+				<option value="675" >管理员（群众文化）</option>
+			
+				<option value="680" >审计专业人员</option>
+			
+				<option value="682" >高级审计师</option>
+			
+				<option value="683" >审计师</option>
+			
+				<option value="684" >助理审计师</option>
+			
+				<option value="685" >审计员</option>
+			
+				<option value="690" >法医专业人员　</option>
+			
+				<option value="691" >主任法医师</option>
+			
+				<option value="692" >副主任法医师</option>
+			
+				<option value="693" >主检法医师</option>
+			
+				<option value="694" >法医师</option>
+			
+				<option value="695" >法医士</option>
+			
+				<option value="980" >思想政治工作人员</option>
+			
+				<option value="982" >高级政工师</option>
+			
+				<option value="983" >政工师</option>
+			
+				<option value="984" >助理政工师</option>
+			
+				<option value="985" >政工员</option>
+			
+			</select>
+		</font>
+		&nbsp;
+			<input name="skjsid" id="skjsid" type="hidden"/>
+			授课教师: <input name="skjs" id="skjs" style="width: 180px;" />&nbsp;	
+			
+					周次:
+					<select name="zc1" id="zc1" size="1">
+						<option value="">
+							-请选择-
+						</option>
+						<option value="1">
+							第1周
+						</option>
+						<option value="2">
+							第2周
+						</option>
+						<option value="3">
+							第3周
+						</option>
+						<option value="4">
+							第4周
+						</option>
+						<option value="5">
+							第5周
+						</option>
+						<option value="6">
+							第6周
+						</option>
+						<option value="7">
+							第7周
+						</option>
+						<option value="8">
+							第8周
+						</option>
+						<option value="9">
+							第9周
+						</option>
+						<option value="10">
+							第10周
+						</option>
+						<option value="11">
+							第11周
+						</option>
+						<option value="12">
+							第12周
+						</option>
+						<option value="13">
+							第13周
+						</option>
+						<option value="14">
+							第14周
+						</option>
+						<option value="15">
+							第15周
+						</option>
+						<option value="16">
+							第16周
+						</option>
+						<option value="17">
+							第17周
+						</option>
+						<option value="18">
+							第18周
+						</option>
+						<option value="19">
+							第19周
+						</option>
+						<option value="20">
+							第20周
+						</option>
+						<option value="21">
+							第21周
+						</option>
+						<option value="22">
+							第22周
+						</option>
+						<option value="23">
+							第23周
+						</option>
+						<option value="24">
+							第24周
+						</option>
+						<option value="25">
+							第25周
+						</option>
+						<option value="26">
+							第26周
+						</option>
+						<option value="27">
+							第27周
+						</option>
+						<option value="28">
+							第28周
+						</option>
+						<option value="29">
+							第29周
+						</option>
+						<option value="30">
+							第30周
+						</option>
+					</select>
+					至
+					<select name="zc2" id="zc2" size="1">
+						<option value="">
+							-请选择-
+						</option>
+						<option value="1">
+							第1周
+						</option>
+						<option value="2">
+							第2周
+						</option>
+						<option value="3">
+							第3周
+						</option>
+						<option value="4">
+							第4周
+						</option>
+						<option value="5">
+							第5周
+						</option>
+						<option value="6">
+							第6周
+						</option>
+						<option value="7">
+							第7周
+						</option>
+						<option value="8">
+							第8周
+						</option>
+						<option value="9">
+							第9周
+						</option>
+						<option value="10">
+							第10周
+						</option>
+						<option value="11">
+							第11周
+						</option>
+						<option value="12">
+							第12周
+						</option>
+						<option value="13">
+							第13周
+						</option>
+						<option value="14">
+							第14周
+						</option>
+						<option value="15">
+							第15周
+						</option>
+						<option value="16">
+							第16周
+						</option>
+						<option value="17">
+							第17周
+						</option>
+						<option value="18">
+							第18周
+						</option>
+						<option value="19">
+							第19周
+						</option>
+						<option value="20">
+							第20周
+						</option>
+						<option value="21">
+							第21周
+						</option>
+						<option value="22">
+							第22周
+						</option>
+						<option value="23">
+							第23周
+						</option>
+						<option value="24">
+							第24周
+						</option>
+						<option value="25">
+							第25周
+						</option>
+						<option value="26">
+							第26周
+						</option>
+						<option value="27">
+							第27周
+						</option>
+						<option value="28">
+							第28周
+						</option>
+						<option value="29">
+							第29周
+						</option>
+						<option value="30">
+							第30周
+						</option>
+					</select>
+
+			星期:
+			<select name="skxq1" id="skxq1" style="width:70px;">
+				<option value="">-请选择-</option>
+				<option  value="1">星期一</option>
+				<option  value="2">星期二</option>
+				<option  value="3">星期三</option>
+				<option  value="4">星期四</option>
+				<option  value="5">星期五</option>
+				<option  value="6">星期六</option>
+				<option  value="7">星期天</option>
+			</select>
+			至
+			<select name="skxq2" id="skxq2" style="width:70px;">
+				<option value="">-请选择-</option>
+				<option  value="1">星期一</option>
+				<option  value="2">星期二</option>
+				<option  value="3">星期三</option>
+				<option  value="4">星期四</option>
+				<option  value="5">星期五</option>
+				<option  value="6">星期六</option>
+				<option  value="7">星期天</option>
+			</select>
+				
+					节次:
+				
+					<select name="jc1" size="1" id="jc1">
+						<option value="">
+							-请选择-
+						</option>
+					</select>
+					至
+					<select name="jc2" size="1" id="jc2">
+						<option value="">
+							-请选择-
+						</option>
+					</select>
+					
+
+		
+		<input type="button" value="查 询"  class="button el-button" style="margin-top: 5px;margin-bottom: 5px;"  onclick="search(this)"/>&nbsp;
+		
+        </div>
+		</form>
+		
+		<table border="0" width="100%" style="height: 680px;" cellspacing="0" cellpadding="0"  id="Table2">
+			<tr>
+				<td height="100%" id="frmtop" >
+					<iframe  id="fcenter" name="fcenter" 
+						style="height:100%; VISIBILITY: inherit; WIDTH: 100%;border: 0"></iframe>
+				</td>
+			</tr>
+	</table>
+	</div>	
+</div>
+<br />
+ 
+<script language="javascript">
+
+function search(obj){
+	//判断是否选了周次并比较大小
+	var zc1 = $("#zc1").val();
+	var zc2 = $("#zc2").val();
+
+	if(zc1!=""&&zc2!=""){
+		zc1 = parseInt(zc1);
+		zc2 = parseInt(zc2);
+		if(zc1>zc2){
+			alert("开始周次不能大于结束周次");
+			return false;
+		}
+	}
+	
+	
+	var jc1 = $("#jc1").val();
+	var jc2 = $("#jc2").val();
+	if(jc1!=""&&jc2!=""){
+		jc1 = parseInt(jc1);
+		jc2 = parseInt(jc2); 
+		if(jc1>jc2){
+			alert("开始节次不能大于结束节次！");
+			return false;
+		}
+	}
+
+	var skxq1 = $("#skxq1").val();
+	var skxq2 = $("#skxq2").val();
+	if(skxq1!=""&&skxq2!=""){
+		skxq1 = parseInt(skxq1);
+		skxq2 = parseInt(skxq2); 
+		if(skxq1>skxq2){
+			alert("开始星期不能大于结束星期！");
+			return false;
+		}
+	}
+	var kbjcmsid = $("#kbjcmsid").val();
+	if(kbjcmsid == ""){
+		alert("请选择时间模式！");
+		return false;
+	}	document.getElementById('Form1').submit();
+}
+
+initJc(document.getElementById("xnxqh"));	
+	function initJc(obj){
+		var kbjcmsid = document.getElementById("kbjcmsid").value;
+		$.ajax({
+			type: "GET",
+			url: "/jsxsd/kbxx/initJc",
+			data: {xnxq:obj.value,kbjcmsid:kbjcmsid},
+			dataType: "json",
+			success: function(data){
+				var jc = $("#jc1");
+				var jc2 = $("#jc2");
+				 if(data.success){ 
+				 	var maxjc = data.mtdjs;
+					var jc = $("#jc1");
+					var jc2 = $("#jc2");
+					var length = $("#jc1")[0].options.length;
+					if(length != maxjc+1){
+						jc.empty();
+						jc2.empty();
+						jc.append("<option value=''>-请选择-</option>");
+						jc2.append("<option value=''>-请选择-</option>");
+						for (var i=1;i<=maxjc;i++){
+							if(i<10){
+								jc.append("<option value='0"+i+"'>0"+i+"</option>");
+								jc2.append("<option value='0"+i+"'>0"+i+"</option>");
+							}else{
+								jc.append("<option value='"+i+"'>"+i+"</option>");
+								jc2.append("<option value='"+i+"'>"+i+"</option>");
+							}
+						}
+					}
+				}else{
+					alert("查询节次出错，请确认是否设置了该学期课表节次！");
+					jc.empty();
+					jc2.empty();
+					jc.append("<option value=''>-请选择-</option>");
+					jc2.append("<option value=''>-请选择-</option>");
+					return false;
+				} 
+							
+			}
+		});
+		
+	}
+	
+$(function(){
+	//edit by wangwei 2018.9.18 增加上课班级检索功能
+	$("#skjs").autocomplete({
+		paramName: "skjs",
+		serviceUrl: "/jsxsd/kbcx/queryJs",
+		minChars: 1,
+		noCache: true,
+		dataType: "json",
+		type: "POST",
+		autoSelectFirst: true,
+		delimiter: ",",
+		params: {"maxRow": "10"},
+		onSearchStart: function(query) {
+			if($("#skjs").val().lastIndexOf(",") > -1) {
+				$("#skjsid").val($("#skjs").val().substring(0, $("#skjs").val().lastIndexOf(",")));
+			} else {
+				$("#skjsid").val("");
+			}
+		},
+		transformResult: function(response) {
+	        return {
+	            suggestions: $.map(response.list, function(dataItem) {
+	                return {value: dataItem.jsxm, data: dataItem};
+	            })
+	        };
+	    },
+	    onSelect: function (suggestion) {
+			$("#skjsid").val(suggestion.data.jg0101id);
+			$("#skjs").val(suggestion.data.jsxm);
+	    }
+    });
+
+});	
+sfxszc(document.getElementById("xnxqh"));
+function sfxszc(obj){
+   var lstJx0415=[{"sknj":null,"xnxq01id":"2011-2012-1","sgpksfsx":null,"xskbsfxsjszc":null,"tkrzjl":"1","xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"7F4A406AE3FE45F9BCDE8371FFF1A0B2","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2018-2019-1","sgpksfsx":null,"xskbsfxsjszc":null,"tkrzjl":null,"xscxkb":null,"mtdjs":"5","jscxkb":null,"jx0415id":"A907FF0263B641EE9787818A92AA2498","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":null,"mend":4},{"sknj":null,"xnxq01id":"2018-2019-2","sgpksfsx":null,"xskbsfxsjszc":null,"tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"D088838EB03641AC9C9CD37903AC6C80","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2021-2022-1","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"781ECD844E6A49B3A7F058B9AF3CBCCB","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2020-2021-2","sgpksfsx":null,"xskbsfxsjszc":"1","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"EC448A5019024434B9C998CDC893CFE6","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2019-2020-1","sgpksfsx":null,"xskbsfxsjszc":"1","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"CB404C70CDDE41EA955A55F9783F43EF","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2020-2021-1","sgpksfsx":null,"xskbsfxsjszc":"1","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"0C255A0C20534AD29DBAFEAFE75F9470","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2022-2023-2","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"EA92B135732E409B940FBBCACB5FE64E","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2023-2024-2","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"D3E34EEDFF43470D8A7A76BC48458404","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2024-2025-2","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"6","jscxkb":"1","jx0415id":"1E5D2201F259421F9F457A35348B1779","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2026-2027-1","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"6","jscxkb":"1","jx0415id":"9712365F5B974C40AE13E6DA32BB82C6","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2019-2020-2","sgpksfsx":null,"xskbsfxsjszc":"1","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"EEFA828F7B00436A9B662143B35ADE54","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2025-2026-2","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"6","jscxkb":"1","jx0415id":"2DF19D7D226248068394E62F67BF8CD7","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2021-2022-2","sgpksfsx":null,"xskbsfxsjszc":"1","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"713B2C9D5EB54BEE813596E107D503AE","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2022-2023-1","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"DB505DAD9A90476D8B80BF2085962ECC","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2023-2024-1","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"5","jscxkb":"1","jx0415id":"699FCC09CE7D463EA14B6A4341195901","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2024-2025-1","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"6","jscxkb":"1","jx0415id":"EE5675459BD149D295FF21D25D8D4685","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4},{"sknj":null,"xnxq01id":"2025-2026-1","sgpksfsx":null,"xskbsfxsjszc":"2","tkrzjl":null,"xscxkb":"1","mtdjs":"6","jscxkb":"1","jx0415id":"C5FFB7E909844830B89A107A8173ABD0","aend":8,"kbjcmsid":"947A14DB0EE37B4EE0530100007FD241","jsgldcxdy":"1","mend":4}];
+   var b = false;
+   for(var i=0;i<lstJx0415.length ;i++){
+      if(lstJx0415[i].xnxq01id==obj.value){
+           if(lstJx0415[i].xskbsfxsjszc==2){
+               b=true;
+           }
+      }
+   }
+   if(b){
+      document.getElementById("jszcxs").style.display="none";
+   }else{
+      document.getElementById("jszcxs").style.display=""; 
+   }
+}	
+</script>
+</body>
+</html>
