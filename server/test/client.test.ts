@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { test } from 'node:test'
@@ -478,6 +481,53 @@ test('a login form without a salt posts the password unchanged', async () => {
     assert.equal(form.get('password'), 'pw-plain')
     assert.equal(form.get('execution'), EXECUTION)
     assert.equal(form.get('lt'), LT)
+  } finally {
+    await cas.close()
+    await jw.close()
+  }
+})
+
+test('a saved cookie jar skips the login page on the next sync', async () => {
+  const hits: string[] = []
+  const jw = await listen((req, res, url) => {
+    hits.push(url.pathname)
+    if (req.headers.cookie === 'JSESSIONID=kept') res.end('<select name="xnxqh"></select>')
+    else {
+      res.writeHead(200, { 'content-type': 'text/html' })
+      res.end('<title>登录</title>')
+    }
+  })
+  const cache = join(mkdtempSync(join(tmpdir(), 'jw-cache-')), 'cookies.json')
+  const cas = await listen((req, res) => {
+    if (req.method === 'GET') {
+      res.end(casForm())
+      return
+    }
+    res.writeHead(302, { Location: `${jw.origin}/jsxsd/sso.jsp`, 'Set-Cookie': 'JSESSIONID=kept; Path=/' })
+    res.end()
+  })
+  try {
+    const savedAt = Date.UTC(2026, 9, 16)
+    const first = createJwClient({
+      casBaseUrl: cas.origin,
+      jwBaseUrl: jw.origin,
+      cookieCachePath: cache,
+      now: () => savedAt,
+    })
+    assert.equal(await first.restoreSession(), false)
+    assert.equal(await first.login('user', 'pw'), 'OK')
+    const saved = JSON.parse(readFileSync(cache, 'utf8')) as { cookies: { name: string; value: string }[] }
+    assert.equal(saved.cookies.some((cookie) => cookie.name === 'JSESSIONID' && cookie.value === 'kept'), true)
+    assert.equal(JSON.stringify(saved).includes('pw'), false)
+    const second = createJwClient({
+      casBaseUrl: 'http://127.0.0.1:1',
+      jwBaseUrl: jw.origin,
+      cookieCachePath: cache,
+      now: () => savedAt + 60_000,
+    })
+    assert.equal(await second.restoreSession(), true)
+    assert.equal(hits.includes('/authserver/login'), false)
+    assert.match(await second.fetchTeacherPage(), /xnxqh/)
   } finally {
     await cas.close()
     await jw.close()

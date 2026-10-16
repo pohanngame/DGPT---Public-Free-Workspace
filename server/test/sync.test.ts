@@ -36,6 +36,9 @@ function fakeClient(pages: {
   const tablesFetched: string[] = []
   return {
     tablesFetched,
+    async restoreSession() {
+      return false
+    },
     async login() {
       return 'OK'
     },
@@ -157,6 +160,9 @@ test('NEED_SLIDER stays on the same job until the slider is submitted', async ()
   })
   const tablesFetched: string[] = []
   const client: JwClient = {
+    async restoreSession() {
+      return false
+    },
     async login() {
       return { code: 'NEED_SLIDER', sign: 'sign-1', bg: 'bg-bytes', piece: 'piece-bytes', y: 12 }
     },
@@ -250,6 +256,9 @@ test('missing credentials with empty env return 422 and start no job', async () 
   delete process.env.JW_PASSWORD
   let logins = 0
   const client: JwClient = {
+    async restoreSession() {
+      return false
+    },
     async login() {
       logins += 1
       return 'OK'

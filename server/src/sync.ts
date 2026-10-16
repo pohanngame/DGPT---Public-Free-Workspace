@@ -6,6 +6,7 @@ import { parseTeacherPage } from './jw/page.ts'
 import { parseTeacherTable, type ParsedCell } from './jw/parseTable.ts'
 
 export interface JwClient {
+  restoreSession(): Promise<boolean>
   login(
     username: string,
     password: string,
@@ -115,6 +116,10 @@ export function getSync(jobId: string): SyncProgress {
 
 async function runLogin(db: DatabaseSync, client: JwClient, job: ActiveJob): Promise<SyncState> {
   try {
+    if (await client.restoreSession?.()) {
+      void fetchTables(db, client, job)
+      return stateOf(job)
+    }
     const login = await client.login(job.username, job.password ?? '')
     if (login !== 'OK') {
       holdForSlider(job, login)

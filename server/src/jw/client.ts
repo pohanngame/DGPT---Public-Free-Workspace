@@ -1,5 +1,9 @@
+import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { encryptPassword } from './cipher.ts'
 import type { JwClient } from '../sync.ts'
+
+const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 const UA = 'jiaowukebiao/0.1'
 
@@ -8,6 +12,8 @@ export interface JwClientOptions {
   jwBaseUrl?: string
   sliderRandom?: (length: number) => string
   timeoutMs?: number
+  cookieCachePath?: string
+  now?: () => number
 }
 
 interface StoredCookie {
@@ -21,10 +27,26 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
   const cookies: StoredCookie[] = []
   let sliderKey = ''
   const timeoutMs = options.timeoutMs ?? 60_000
+  const now = options.now ?? Date.now
+  const cachePath = options.cookieCachePath
   const casBase = () => trimSlash(options.casBaseUrl ?? process.env.JW_BASE_URL ?? 'https://authserver.dgpt.edu.cn')
   const jwBase = () => trimSlash(options.jwBaseUrl ?? process.env.JW_JW_BASE_URL ?? 'https://jw.dgpt.edu.cn')
 
   return {
+    async restoreSession(): Promise<boolean> {
+      if (!cachePath) return false
+      const saved = readCookieCache(cachePath, now())
+      if (!saved) return false
+      cookies.splice(0, cookies.length, ...saved)
+      try {
+        const html = await followGet(cookies, `${jwBase()}/jsxsd/kbcx/kbxx_teacher`, timeoutMs)
+        return html.includes('xnxqh')
+      } catch {
+        cookies.splice(0, cookies.length)
+        return false
+      }
+    },
+
     async login(username, password) {
       const loginUrl = `${casBase()}/authserver/login`
       let page = await openLoginPage(cookies, loginUrl, timeoutMs)
@@ -68,6 +90,7 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
       if (!new URL(landed.url).pathname.startsWith('/jsxsd/')) {
         await follow(cookies, `${jwBase()}/jsxsd/sso.jsp`, timeoutMs)
       }
+      if (cachePath) writeCookieCache(cachePath, cookies, now())
       return 'OK'
     },
 
@@ -88,7 +111,10 @@ export function createJwClient(options: JwClientOptions = {}): JwClient {
       })
       if (response.status !== 200) throw httpError(response.status)
       const json = (await response.json()) as { errorCode?: number; errorMsg?: string; message?: string }
-      if (json.errorCode === 1) return 'OK'
+      if (json.errorCode === 1) {
+        if (cachePath) writeCookieCache(cachePath, cookies, now())
+        return 'OK'
+      }
       return { code: 'SLIDER_FAILED', message: json.errorMsg || json.message || 'slider rejected' }
     },
 
@@ -297,6 +323,37 @@ function absorb(cookies: StoredCookie[], response: Response): void {
     if (index >= 0) cookies[index] = next
     else cookies.push(next)
   }
+}
+
+function readCookieCache(file: string, now: number): StoredCookie[] | null {
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8')) as { savedAt?: unknown; cookies?: unknown }
+    if (typeof parsed.savedAt !== 'number' || now - parsed.savedAt > COOKIE_MAX_AGE_MS) return null
+    if (!Array.isArray(parsed.cookies)) return null
+    const saved: StoredCookie[] = []
+    for (const item of parsed.cookies) {
+      if (!item || typeof item !== 'object') return null
+      const cookie = item as Partial<StoredCookie>
+      if (typeof cookie.name !== 'string' || typeof cookie.value !== 'string' || typeof cookie.domain !== 'string') return null
+      if (!cookie.name || cookie.name.toLowerCase() === 'password') return null
+      saved.push({ name: cookie.name, value: cookie.value, domain: cookie.domain, hostOnly: cookie.hostOnly === true })
+    }
+    return saved.length > 0 ? saved : null
+  } catch {
+    return null
+  }
+}
+
+function writeCookieCache(file: string, cookies: StoredCookie[], now: number): void {
+  const temporary = `${file}.${process.pid}.tmp`
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(temporary, JSON.stringify({ savedAt: now, cookies }))
+  try {
+    chmodSync(temporary, 0o600)
+  } catch {
+    // Windows may reject the Unix mode. The file is still local and gitignored.
+  }
+  renameSync(temporary, file)
 }
 
 function cookieHeader(cookies: StoredCookie[], url: string): string {

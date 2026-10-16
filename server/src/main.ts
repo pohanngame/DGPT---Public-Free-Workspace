@@ -11,6 +11,6 @@ const file = join(process.cwd(), 'data', 'app.sqlite')
 mkdirSync(dirname(file), { recursive: true })
 
 const db = openDatabase(file)
-const app = buildApp(db, { jwClient: createJwClient() })
+const app = buildApp(db, { jwClient: createJwClient({ cookieCachePath: join(process.cwd(), '.jw_cookie_cache.json') }) })
 
 await app.listen({ host: '127.0.0.1', port })
