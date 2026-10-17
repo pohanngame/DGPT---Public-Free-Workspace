@@ -31,7 +31,7 @@ test('week text (2-13周) occupies weeks 2 through 13', () => {
 })
 
 test('a 2023 table with five slots per day keeps the friday class', () => {
-  const html = readFileSync(new URL('../../probe/out/old-semester-table.html', import.meta.url), 'utf8')
+  const html = readFileSync(new URL('./fixtures/old-semester-five-slots.html', import.meta.url), 'utf8')
   const teachers = parseTeacherTable(html)
   const teacher = teachers.find((item) => item.name === '李龙根')
   assert.ok(teachers.length > 1)

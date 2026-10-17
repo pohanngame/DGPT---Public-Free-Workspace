@@ -165,8 +165,11 @@ export function buildApp(db: DatabaseSync, options: BuildAppOptions = {}): Fasti
     if (typeof body.semesterCode !== 'string' || body.semesterCode.length === 0) {
       return reply.code(422).send(errorBody('VALIDATION_ERROR', 'semesterCode is required'))
     }
-    const username = stringOrEnv(body.username, 'JW_USERNAME')
-    const password = stringOrEnv(body.password, 'JW_PASSWORD')
+    const bodyUsername = typeof body.username === 'string' ? body.username : ''
+    const bodyPassword = typeof body.password === 'string' ? body.password : ''
+    const requestHasCredentials = bodyUsername.length > 0 && bodyPassword.length > 0
+    const username = requestHasCredentials ? bodyUsername : (process.env.JW_USERNAME ?? '')
+    const password = requestHasCredentials ? bodyPassword : (process.env.JW_PASSWORD ?? '')
     if (!username || !password) {
       return reply.code(422).send(errorBody('VALIDATION_ERROR', 'username and password are required'))
     }
@@ -207,12 +210,6 @@ export function buildApp(db: DatabaseSync, options: BuildAppOptions = {}): Fasti
   })
 
   return app
-}
-
-function stringOrEnv(value: unknown, envName: 'JW_USERNAME' | 'JW_PASSWORD'): string | undefined {
-  if (typeof value === 'string' && value.length > 0) return value
-  const fromEnv = process.env[envName]
-  return fromEnv && fromEnv.length > 0 ? fromEnv : undefined
 }
 
 function isSliderMove(body: { canvasWidth?: unknown; move?: unknown; tracks?: unknown }): boolean {

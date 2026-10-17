@@ -36,9 +36,6 @@ function fakeClient(pages: {
   const tablesFetched: string[] = []
   return {
     tablesFetched,
-    async restoreSession() {
-      return false
-    },
     async login() {
       return 'OK'
     },
@@ -160,9 +157,6 @@ test('NEED_SLIDER stays on the same job until the slider is submitted', async ()
   })
   const tablesFetched: string[] = []
   const client: JwClient = {
-    async restoreSession() {
-      return false
-    },
     async login() {
       return { code: 'NEED_SLIDER', sign: 'sign-1', bg: 'bg-bytes', piece: 'piece-bytes', y: 12 }
     },
@@ -249,6 +243,78 @@ test('two unselected kbjcmsid options fail the job with KBJCMSID_AMBIGUOUS', asy
   })
 })
 
+test('sync start uses both environment credentials when request omits password', async () => {
+  const previousUser = process.env.JW_USERNAME
+  const previousPassword = process.env.JW_PASSWORD
+  process.env.JW_USERNAME = 'env-user'
+  process.env.JW_PASSWORD = 'env-password'
+  let received: [string, string] | undefined
+  const client: JwClient = {
+    async login(username, password) {
+      received = [username, password]
+      return 'OK'
+    },
+    async submitSlider() { return 'OK' },
+    async fetchTeacherPage() { return teacherPage([]) },
+    async fetchCollegeTable() { return collegeTable() },
+    async fetchAllTeachersTable() { return collegeTable() },
+  }
+  try {
+    await withApp(client, async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/sync/start',
+        payload: { semesterCode: SEMESTER, username: 'request-user' },
+      })
+      assert.equal(response.statusCode, 200)
+      assert.deepEqual(received, ['env-user', 'env-password'])
+    })
+  } finally {
+    if (previousUser === undefined) delete process.env.JW_USERNAME
+    else process.env.JW_USERNAME = previousUser
+    if (previousPassword === undefined) delete process.env.JW_PASSWORD
+    else process.env.JW_PASSWORD = previousPassword
+  }
+})
+
+test('sync start uses both request credentials when both are provided', async () => {
+  const previousUser = process.env.JW_USERNAME
+  const previousPassword = process.env.JW_PASSWORD
+  process.env.JW_USERNAME = 'env-user'
+  process.env.JW_PASSWORD = 'env-password'
+  let received: [string, string] | undefined
+  const client: JwClient = {
+    async login(username, password) {
+      received = [username, password]
+      return 'OK'
+    },
+    async submitSlider() { return 'OK' },
+    async fetchTeacherPage() { return teacherPage([]) },
+    async fetchCollegeTable() { return collegeTable() },
+    async fetchAllTeachersTable() { return collegeTable() },
+  }
+  try {
+    await withApp(client, async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/sync/start',
+        payload: {
+          semesterCode: SEMESTER,
+          username: 'request-user',
+          password: 'request-password',
+        },
+      })
+      assert.equal(response.statusCode, 200)
+      assert.deepEqual(received, ['request-user', 'request-password'])
+    })
+  } finally {
+    if (previousUser === undefined) delete process.env.JW_USERNAME
+    else process.env.JW_USERNAME = previousUser
+    if (previousPassword === undefined) delete process.env.JW_PASSWORD
+    else process.env.JW_PASSWORD = previousPassword
+  }
+})
+
 test('missing credentials with empty env return 422 and start no job', async () => {
   const previousUser = process.env.JW_USERNAME
   const previousPassword = process.env.JW_PASSWORD
@@ -256,9 +322,6 @@ test('missing credentials with empty env return 422 and start no job', async () 
   delete process.env.JW_PASSWORD
   let logins = 0
   const client: JwClient = {
-    async restoreSession() {
-      return false
-    },
     async login() {
       logins += 1
       return 'OK'

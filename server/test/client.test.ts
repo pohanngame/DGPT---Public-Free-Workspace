@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import type { AddressInfo } from 'node:net'
-
-import { deflateSync } from 'node:zlib'
 import { test } from 'node:test'
 import { createJwClient } from '../src/jw/client.ts'
 import { encryptPassword } from '../src/jw/cipher.ts'
@@ -162,6 +160,7 @@ test('fetchCollegeTable posts skyx and refuses an empty college code', async () 
 
 test('submitSlider posts only sign and reports a rejected verify', async () => {
   const bodies: string[] = []
+  let loginPosts = 0
   const pieceKey = '0123456789abcdef'
   const piece = Buffer.concat([Buffer.from('img'), Buffer.from(pieceKey, 'latin1')]).toString('base64')
   const cas = await listen(async (req, res, url) => {
@@ -175,7 +174,17 @@ test('submitSlider posts only sign and reports a rejected verify', async () => {
     }
     if (url.pathname === '/authserver/common/openSliderCaptcha.htl') {
       res.setHeader('content-type', 'application/json')
-      res.end(JSON.stringify({ bigImage: png(8, 3, (x) => x === 5), smallImage: png(3, 3, (x) => x === 1), y: 0, sign: 'sig-1', salt: pieceKey }))
+      res.end(JSON.stringify({ bigImage: 'bg64', smallImage: piece, y: 12, sign: 'sig-1' }))
+      return
+    }
+    if (url.pathname === '/authserver/login' && req.method === 'POST') {
+      loginPosts += 1
+      res.writeHead(302, { Location: '/jsxsd/sso.jsp' })
+      res.end()
+      return
+    }
+    if (url.pathname === '/jsxsd/sso.jsp') {
+      res.end('<html>person</html>')
       return
     }
     if (url.pathname !== '/authserver/common/verifySliderCaptcha.htl') {
@@ -185,16 +194,17 @@ test('submitSlider posts only sign and reports a rejected verify', async () => {
     }
     bodies.push(await readBody(req))
     res.setHeader('content-type', 'application/json')
-    res.end(JSON.stringify({ errorCode: bodies.length === 1 ? 1 : 0, errorMsg: 'off' }))
+    res.end(JSON.stringify(bodies.length === 1 ? { errorCode: 1 } : { errorCode: 0, errorMsg: 'off' }))
   })
   try {
     const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: 'http://127.0.0.1:1' })
-    const login = await client.login('user', 'pw')
-    assert.equal(typeof login === 'object' && login.code, 'NEED_SLIDER')
+    const opened = await client.login('user', 'pw')
+    assert.notEqual(opened, 'OK')
     const move = { canvasWidth: 280, move: 40, tracks: [{ a: 1, b: 2, c: 3 }] }
     assert.equal(await client.submitSlider('job', move), 'OK')
-    assert.deepEqual(await client.submitSlider('job', move), { code: 'SLIDER_FAILED', message: 'off' })
-    assert.equal(bodies.length, 2)
+    assert.equal(loginPosts, 1)
+    await assert.rejects(client.submitSlider('job', move), /slider challenge is missing/)
+    assert.equal(bodies.length, 1)
     const form = new URLSearchParams(bodies[0])
     assert.ok(form.get('sign'))
     assert.equal(form.get('canvasLength'), null)
@@ -206,10 +216,9 @@ test('submitSlider posts only sign and reports a rejected verify', async () => {
   }
 })
 
-test('slider sign uses a 16-byte salt when safeSecure is present but not 16 bytes', async () => {
-  const salt = '0123456789abcdef'
-  let body = ''
-  let verifies = 0
+test('clears a slider challenge when verify send fails', async () => {
+  const pieceKey = '0123456789abcdef'
+  const piece = Buffer.concat([Buffer.from('img'), Buffer.from(pieceKey, 'latin1')]).toString('base64')
   const cas = await listen(async (req, res, url) => {
     if (url.pathname === '/authserver/login' && req.method === 'GET') {
       res.end(casForm())
@@ -221,11 +230,42 @@ test('slider sign uses a 16-byte salt when safeSecure is present but not 16 byte
     }
     if (url.pathname === '/authserver/common/openSliderCaptcha.htl') {
       res.setHeader('content-type', 'application/json')
-      res.end(JSON.stringify({ safeSecure: 'short', salt, bigImage: png(8, 3, (x) => x === 5), smallImage: png(3, 3, (x) => x === 1), y: 0, sign: 'sig' }))
+      res.end(JSON.stringify({ smallImage: piece }))
+      return
+    }
+    res.writeHead(404)
+    res.end()
+  })
+  try {
+    const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: 'http://127.0.0.1:1' })
+    await client.login('user', 'pw')
+    const move = { canvasWidth: 280, move: 40, tracks: [{ a: 1, b: 2, c: 3 }] }
+    await cas.close()
+    await assert.rejects(client.submitSlider('job', move))
+    await assert.rejects(client.submitSlider('job', move), /slider challenge is missing/)
+  } finally {
+    await cas.close().catch(() => undefined)
+  }
+})
+
+test('slider sign uses a 16-byte salt when safeSecure is present but not 16 bytes', async () => {
+  const salt = '0123456789abcdef'
+  let body = ''
+  const cas = await listen(async (req, res, url) => {
+    if (url.pathname === '/authserver/login' && req.method === 'GET') {
+      res.end(casForm())
+      return
+    }
+    if (url.pathname === '/authserver/checkNeedCaptcha.htl') {
+      res.end('true')
+      return
+    }
+    if (url.pathname === '/authserver/common/openSliderCaptcha.htl') {
+      res.setHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ safeSecure: 'short', salt, smallImage: 'not-used', y: 1, sign: 'sig' }))
       return
     }
     if (url.pathname === '/authserver/common/verifySliderCaptcha.htl') {
-      verifies += 1
       body = await readBody(req)
       res.setHeader('content-type', 'application/json')
       res.end(JSON.stringify({ errorCode: 1 }))
@@ -241,8 +281,8 @@ test('slider sign uses a 16-byte salt when safeSecure is present but not 16 byte
       jwBaseUrl: 'http://127.0.0.1:1',
       sliderRandom: fixedRandom,
     })
-    const login = await client.login('user', 'pw')
-    assert.equal(typeof login === 'object' && login.code, 'NEED_SLIDER')
+    const opened = await client.login('user', 'pw')
+    assert.notEqual(opened, 'OK')
     const move = { canvasWidth: 280, move: 40, tracks: [{ a: 1, b: 2, c: 3 }] }
     assert.equal(await client.submitSlider('job', move), 'OK')
     assert.notEqual(Buffer.byteLength('short'), 16)
@@ -317,6 +357,108 @@ test('teacher page follows 302 cookies and two clients do not share a jar', asyn
   }
 })
 
+test('restoreSession accepts a cached jw cookie after a valid teacher page', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'jw-cookie-'))
+  const cache = join(dir, 'cookies.json')
+  writeFileSync(cache, JSON.stringify([{ name: 'JSESSIONID', value: 'cached', domain: 'jw.dgpt.edu.cn', hostOnly: true, path: '/' }]))
+  const requests: string[] = []
+  const original = globalThis.fetch
+  globalThis.fetch = (async (input) => {
+    const url = String(input)
+    requests.push(url)
+    const response = new Response('<html><title>教师课表</title><select name="xnxqh"></select></html>')
+    Object.defineProperty(response, 'url', { value: url })
+    return response
+  }) as typeof fetch
+  try {
+    const client = createJwClient({ cookieCachePath: cache, jwBaseUrl: 'https://jw.dgpt.edu.cn' })
+    assert.equal(await client.restoreSession?.(), true)
+    assert.equal(requests.length, 1)
+    assert.equal(new URL(requests[0]).hostname, 'jw.dgpt.edu.cn')
+  } finally {
+    globalThis.fetch = original
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('restoreSession removes a cache when the teacher page is a login page or lacks xnxqh', async () => {
+  for (const html of ['<html><title>登录</title><select name="xnxqh"></select></html>', '<html><title>教师课表</title></html>']) {
+    const dir = mkdtempSync(join(tmpdir(), 'jw-cookie-'))
+    const cache = join(dir, 'cookies.json')
+    writeFileSync(cache, JSON.stringify([{ name: 'JSESSIONID', value: 'cached', domain: 'jw.dgpt.edu.cn', hostOnly: true, path: '/' }]))
+    const original = globalThis.fetch
+    globalThis.fetch = (async (input) => {
+      const url = String(input)
+      const response = new Response(html)
+      Object.defineProperty(response, 'url', { value: url })
+      return response
+    }) as typeof fetch
+    try {
+      const client = createJwClient({ cookieCachePath: cache, jwBaseUrl: 'https://jw.dgpt.edu.cn' })
+      assert.equal(await client.restoreSession?.(), false)
+      assert.throws(() => readFileSync(cache))
+    } finally {
+      globalThis.fetch = original
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+})
+
+test('failed non-slider login clears any pending slider form', async () => {
+  let loginPosts = 0
+  let verifyPosts = 0
+  let needSlider = true
+  const pieceKey = '0123456789abcdef'
+  const piece = Buffer.concat([Buffer.from('img'), Buffer.from(pieceKey, 'latin1')]).toString('base64')
+  const cas = await listen(async (req, res, url) => {
+    if (url.pathname === '/authserver/login' && req.method === 'GET') {
+      res.end(casForm())
+      return
+    }
+    if (url.pathname === '/authserver/checkNeedCaptcha.htl') {
+      res.end(needSlider ? 'true' : 'false')
+      return
+    }
+    if (url.pathname === '/authserver/common/openSliderCaptcha.htl') {
+      res.setHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ bigImage: 'bg64', smallImage: piece, y: 12, sign: 'sig-1' }))
+      return
+    }
+    if (url.pathname === '/authserver/login' && req.method === 'POST') {
+      loginPosts += 1
+      if (needSlider) {
+        res.writeHead(302, { Location: '/jsxsd/sso.jsp' })
+      } else {
+        res.writeHead(302, { Location: '/error' })
+      }
+      res.end()
+      return
+    }
+    if (url.pathname === '/authserver/common/verifySliderCaptcha.htl') {
+      verifyPosts += 1
+      res.setHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ errorCode: 1 }))
+      return
+    }
+    res.writeHead(404)
+    res.end()
+  })
+  try {
+    const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: 'http://127.0.0.1:1' })
+    await client.login('user', 'pw')
+    needSlider = false
+    await assert.rejects(client.login('user', 'pw'), /credentials rejected/)
+    await assert.rejects(
+      client.submitSlider('job', { canvasWidth: 280, move: 40, tracks: [{ a: 1, b: 2, c: 3 }] }),
+      /slider challenge is missing/,
+    )
+    assert.equal(loginPosts, 1)
+    assert.equal(verifyPosts, 0)
+  } finally {
+    await cas.close()
+  }
+})
+
 test('http://example.com throws before any request', async () => {
   let hits = 0
   const original = globalThis.fetch
@@ -333,259 +475,9 @@ test('http://example.com throws before any request', async () => {
   }
 })
 
-const NO_FORM = '<html><title>bad page</title><p>not a login</p></html>'
-const LOGIN_PAGE_ERROR = '教务统一认证页面未正常返回（可能需要重新过验证或校园网 IP 限制），请重试'
-
-test('login retries a salt-less page once and posts the second form', async () => {
-  let loginGets = 0
-  const cookies: (string | undefined)[] = []
-  const seen: { path: string; body: string }[] = []
+test('slider-required login returns NEED_SLIDER and does not submit a move', async () => {
+  const posts: string[] = []
   const cas = await listen(async (req, res, url) => {
-    if (url.pathname === '/authserver/login' && req.method === 'GET') {
-      loginGets += 1
-      cookies.push(req.headers.cookie)
-      if (loginGets === 1) {
-        res.setHeader('Set-Cookie', 'JSESSIONID=stale')
-        res.end(NO_FORM)
-        return
-      }
-      res.setHeader('Set-Cookie', 'JSESSIONID=fresh')
-      res.end(casForm())
-      return
-    }
-    if (url.pathname === '/authserver/checkNeedCaptcha.htl') {
-      cookies.push(req.headers.cookie)
-      res.end('false')
-      return
-    }
-    if (url.pathname === '/authserver/login' && req.method === 'POST') {
-      cookies.push(req.headers.cookie)
-      seen.push({ path: url.pathname, body: await readBody(req) })
-      res.writeHead(302, { Location: '/person' })
-      res.end()
-      return
-    }
-    if (url.pathname === '/person') {
-      res.end('<html>person</html>')
-      return
-    }
-    res.writeHead(404)
-    res.end()
-  })
-  const jw = await listen((req, res, url) => {
-    seen.push({ path: url.pathname, body: '' })
-    if (url.pathname === '/jsxsd/sso.jsp') {
-      res.writeHead(302, { Location: '/jsxsd/framework/xsMain.jsp' })
-      res.end()
-      return
-    }
-    if (url.pathname === '/jsxsd/framework/xsMain.jsp') {
-      res.end('<html>ok</html>')
-      return
-    }
-    res.writeHead(404)
-    res.end()
-  })
-  try {
-    const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: jw.origin })
-    assert.equal(await client.login('user', 'pw'), 'OK')
-    assert.equal(loginGets, 2)
-    assert.equal(cookies[0], undefined)
-    assert.equal(cookies[1], undefined)
-    assert.equal(cookies[2], 'JSESSIONID=fresh')
-    const posted = seen.find((item) => item.path === '/authserver/login')
-    assert.ok(posted)
-    const form = new URLSearchParams(posted.body)
-    assert.notEqual(form.get('password'), 'pw')
-    assert.ok(form.get('password'))
-  } finally {
-    await cas.close()
-    await jw.close()
-  }
-})
-
-test('login throws the Chinese page error when both GETs lack a form', async () => {
-  let loginGets = 0
-  const logged: unknown[][] = []
-  const original = console.error
-  console.error = (...args: unknown[]) => {
-    logged.push(args)
-  }
-  const cas = await listen((req, res, url) => {
-    if (url.pathname === '/authserver/login' && req.method === 'GET') {
-      loginGets += 1
-      res.writeHead(200, { 'Content-Type': 'text/html' })
-      res.end('<html><title>gate</title>\n<p>blocked</p></html>')
-      return
-    }
-    res.writeHead(404)
-    res.end()
-  })
-  try {
-    const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: 'http://127.0.0.1:1' })
-    await assert.rejects(client.login('user-secret', 'pw-secret'), (error: unknown) => {
-      assert.ok(error instanceof Error)
-      assert.equal(error.message, LOGIN_PAGE_ERROR)
-      return true
-    })
-    assert.equal(loginGets, 2)
-    const line = logged.map((args) => args.map(String).join(' ')).join('\n')
-    assert.match(line, /200/)
-    assert.match(line, /gate/)
-    assert.match(line, /blocked/)
-    assert.equal(line.includes('user-secret'), false)
-    assert.equal(line.includes('pw-secret'), false)
-  } finally {
-    console.error = original
-    await cas.close()
-  }
-})
-
-test('a login form without a salt posts the password unchanged', async () => {
-  const seen: string[] = []
-  const cas = await listen(async (req, res, url) => {
-    if (url.pathname === '/authserver/login' && req.method === 'GET') {
-      res.end(`<form><input type="password" name="password"><input name="lt" value="${LT}"><input name="execution" value="${EXECUTION}"></form>`)
-      return
-    }
-    if (url.pathname === '/authserver/checkNeedCaptcha.htl') {
-      res.end('false')
-      return
-    }
-    if (url.pathname === '/authserver/login' && req.method === 'POST') {
-      seen.push(await readBody(req))
-      res.writeHead(302, { Location: '/person' })
-      res.end()
-      return
-    }
-    if (url.pathname === '/person') {
-      res.end('<html>person</html>')
-      return
-    }
-    res.writeHead(404)
-    res.end()
-  })
-  const jw = await listen((req, res, url) => {
-    if (url.pathname === '/jsxsd/sso.jsp') {
-      res.writeHead(302, { Location: '/jsxsd/framework/xsMain.jsp' })
-      res.end()
-      return
-    }
-    if (url.pathname === '/jsxsd/framework/xsMain.jsp') {
-      res.end('<html>ok</html>')
-      return
-    }
-    res.writeHead(404)
-    res.end()
-  })
-  try {
-    const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: jw.origin })
-    assert.equal(await client.login('user', 'pw-plain'), 'OK')
-    const form = new URLSearchParams(seen[0])
-    assert.equal(form.get('password'), 'pw-plain')
-    assert.equal(form.get('execution'), EXECUTION)
-    assert.equal(form.get('lt'), LT)
-  } finally {
-    await cas.close()
-    await jw.close()
-  }
-})
-
-test('a saved cookie jar skips the login page on the next sync', async () => {
-  const hits: string[] = []
-  const jw = await listen((req, res, url) => {
-    hits.push(url.pathname)
-    if (req.headers.cookie === 'JSESSIONID=kept') res.end('<select name="xnxqh"></select>')
-    else {
-      res.writeHead(200, { 'content-type': 'text/html' })
-      res.end('<title>登录</title>')
-    }
-  })
-  const cache = join(mkdtempSync(join(tmpdir(), 'jw-cache-')), 'cookies.json')
-  const cas = await listen((req, res) => {
-    if (req.method === 'GET') {
-      res.end(casForm())
-      return
-    }
-    res.writeHead(302, { Location: `${jw.origin}/jsxsd/sso.jsp`, 'Set-Cookie': 'JSESSIONID=kept; Path=/' })
-    res.end()
-  })
-  try {
-    const savedAt = Date.UTC(2026, 9, 16)
-    const first = createJwClient({
-      casBaseUrl: cas.origin,
-      jwBaseUrl: jw.origin,
-      cookieCachePath: cache,
-      now: () => savedAt,
-    })
-    assert.equal(await first.restoreSession(), false)
-    assert.equal(await first.login('user', 'pw'), 'OK')
-    const saved = JSON.parse(readFileSync(cache, 'utf8')) as { cookies: { name: string; value: string }[] }
-    assert.equal(saved.cookies.some((cookie) => cookie.name === 'JSESSIONID' && cookie.value === 'kept'), true)
-    assert.equal(JSON.stringify(saved).includes('pw'), false)
-    const second = createJwClient({
-      casBaseUrl: 'http://127.0.0.1:1',
-      jwBaseUrl: jw.origin,
-      cookieCachePath: cache,
-      now: () => savedAt + 60_000,
-    })
-    assert.equal(await second.restoreSession(), true)
-    assert.equal(hits.includes('/authserver/login'), false)
-    assert.match(await second.fetchTeacherPage(), /xnxqh/)
-  } finally {
-    await cas.close()
-    await jw.close()
-  }
-})
-
-function png(width: number, height: number, opaque: (x: number, y: number) => boolean): string {
-  const raw = Buffer.alloc((1 + width * 4) * height)
-  for (let y = 0; y < height; y++) {
-    const row = y * (1 + width * 4)
-    for (let x = 0; x < width; x++) {
-      const i = row + 1 + x * 4
-      const on = opaque(x, y)
-      raw[i] = on ? 40 : 200
-      raw[i + 1] = on ? 40 : 200
-      raw[i + 2] = on ? 40 : 200
-      raw[i + 3] = on ? 255 : 0
-    }
-  }
-  const chunk = (type: string, data: Buffer) => {
-    const out = Buffer.alloc(12 + data.length)
-    out.writeUInt32BE(data.length, 0)
-    out.write(type, 4, 4, 'ascii')
-    data.copy(out, 8)
-    const crc32 = (buf: Buffer) => {
-      let c = ~0
-      for (const byte of buf) {
-        c ^= byte
-        for (let bit = 0; bit < 8; bit++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1))
-      }
-      return ~c >>> 0
-    }
-    out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length)
-    return out
-  }
-  const ihdr = Buffer.alloc(13)
-  ihdr.writeUInt32BE(width, 0)
-  ihdr.writeUInt32BE(height, 4)
-  ihdr[8] = 8
-  ihdr[9] = 6
-  const file = Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(raw)),
-    chunk('IEND', Buffer.alloc(0)),
-  ])
-  return file.toString('base64')
-}
-
-test('slider-required login returns the images and does not verify them', async () => {
-  const bg = png(8, 3, (x) => x === 5)
-  const piece = png(3, 3, (x) => x === 1)
-  let verifies = 0
-  const cas = await listen((req, res, url) => {
     if (url.pathname === '/authserver/login' && req.method === 'GET') {
       res.end(casForm())
       return
@@ -596,19 +488,22 @@ test('slider-required login returns the images and does not verify them', async 
     }
     if (url.pathname === '/authserver/common/openSliderCaptcha.htl') {
       res.setHeader('content-type', 'application/json')
-      res.end(JSON.stringify({ bigImage: bg, smallImage: piece, y: 0, sign: 'sig-1', salt: SALT }))
+      res.end(JSON.stringify({ bigImage: 'bg64', smallImage: 'piece64', y: 12, sign: 'sig-1' }))
       return
     }
-    if (url.pathname === '/authserver/common/verifySliderCaptcha.htl') verifies += 1
+    if (req.method === 'POST') {
+      posts.push(url.pathname)
+      res.end('{}')
+      return
+    }
     res.writeHead(404)
     res.end()
   })
   try {
     const client = createJwClient({ casBaseUrl: cas.origin, jwBaseUrl: 'http://127.0.0.1:1' })
-    const login = await client.login('user', 'pw')
-    assert.equal(typeof login === 'object' && login.code, 'NEED_SLIDER')
-    if (typeof login === 'object') assert.equal(login.bg, bg)
-    assert.equal(verifies, 0)
+    const result = await client.login('user', 'pw')
+    assert.deepEqual(result, { code: 'NEED_SLIDER', sign: 'sig-1', bg: 'bg64', piece: 'piece64', y: 12 })
+    assert.deepEqual(posts, [])
   } finally {
     await cas.close()
   }

@@ -6,7 +6,8 @@
     "test": "node --test --experimental-strip-types server/test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build && tsc --noEmit",
+    "start": "node --experimental-strip-types -e \"process.env.NODE_ENV='production'; import('./server/src/main.ts')\""
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

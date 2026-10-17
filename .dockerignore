@@ -1,0 +1,12 @@
+node_modules
+xu-shu-xitong
+docs
+.pi
+.memory
+.superpowers
+.git
+data
+dist
+probe
+.playwright-cli
+.env.local

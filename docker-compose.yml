@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+    volumes:
+      - ./data:/app/data
+      - ./.env.local:/app/.env.local
+    restart: unless-stopped
+    # Adjust the memory limit for the target machine as needed.
+    mem_limit: 512m
