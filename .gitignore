@@ -7,10 +7,12 @@ data/
 *.sqlite-*
 *.sqlite-journal
 .memory/
+.workbuddy/
 .superpowers/
 .playwright-cli/
 .pi/
 production.log
+production.err
 xu-shu-xitong/
 probe/
 *.tsbuildinfo

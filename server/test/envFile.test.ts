@@ -12,29 +12,33 @@ test('parseEnvFile reads JW_BASE_URL when the first line has a UTF-8 BOM', () =>
   assert.equal('OTHER' in parsed, false)
 })
 
-test('readEnvLocal sets only allowlisted keys that are not already in the environment', () => {
+test('readEnvLocal sets only allowlisted keys and never loads credentials', () => {
   const dir = mkdtempSync(join(tmpdir(), 'env-local-'))
   const previousPort = process.env.PORT
   delete process.env.JW_BASE_URL
   delete process.env.JW_USERNAME
+  delete process.env.JW_PASSWORD
   delete process.env.NOT_ALLOWED
   process.env.PORT = '9'
   try {
     writeFileSync(
       join(dir, '.env.local'),
-      '\uFEFF JW_BASE_URL = https://example.invalid/jw \nPORT=4000\nJW_USERNAME=user\nNOT_ALLOWED=1\n',
+      '\uFEFF JW_BASE_URL = https://example.invalid/jw \nPORT=4000\nJW_USERNAME=user\nJW_PASSWORD=secret\nNOT_ALLOWED=1\n',
     )
     const applied = readEnvLocal(dir)
     assert.equal(applied.JW_BASE_URL, 'https://example.invalid/jw')
     assert.equal(process.env.JW_BASE_URL, 'https://example.invalid/jw')
     assert.equal(process.env.PORT, '9')
-    assert.equal(process.env.JW_USERNAME, 'user')
+    assert.equal('JW_USERNAME' in applied, false)
+    assert.equal(process.env.JW_USERNAME, undefined)
+    assert.equal(process.env.JW_PASSWORD, undefined)
     assert.equal(process.env.NOT_ALLOWED, undefined)
   } finally {
     if (previousPort === undefined) delete process.env.PORT
     else process.env.PORT = previousPort
     delete process.env.JW_BASE_URL
     delete process.env.JW_USERNAME
+    delete process.env.JW_PASSWORD
     rmSync(dir, { recursive: true, force: true })
   }
 })

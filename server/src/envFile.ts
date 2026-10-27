@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const ALLOWED = new Set(['JW_BASE_URL', 'JW_JW_BASE_URL', 'JW_USERNAME', 'JW_PASSWORD', 'PORT'])
+// 只允许地址与端口。账号密码永不从文件读取，同步时由前端逐次输入。
+const ALLOWED = new Set(['JW_BASE_URL', 'JW_JW_BASE_URL', 'PORT'])
 
 export function parseEnvFile(text: string): Record<string, string> {
   const parsed: Record<string, string> = {}

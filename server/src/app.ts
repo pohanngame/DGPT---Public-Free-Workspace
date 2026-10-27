@@ -165,15 +165,13 @@ export function buildApp(db: DatabaseSync, options: BuildAppOptions = {}): Fasti
     if (typeof body.semesterCode !== 'string' || body.semesterCode.length === 0) {
       return reply.code(422).send(errorBody('VALIDATION_ERROR', 'semesterCode is required'))
     }
-    const bodyUsername = typeof body.username === 'string' ? body.username : ''
+    const bodyUsername = typeof body.username === 'string' ? body.username.trim() : ''
     const bodyPassword = typeof body.password === 'string' ? body.password : ''
-    const requestHasCredentials = bodyUsername.length > 0 && bodyPassword.length > 0
-    const username = requestHasCredentials ? bodyUsername : (process.env.JW_USERNAME ?? '')
-    const password = requestHasCredentials ? bodyPassword : (process.env.JW_PASSWORD ?? '')
-    if (!username || !password) {
+    // 账号密码只能来自本次请求：服务端不保存凭据，也不读取环境变量兜底。
+    if (!bodyUsername || !bodyPassword) {
       return reply.code(422).send(errorBody('VALIDATION_ERROR', 'username and password are required'))
     }
-    return startSync(db, client, { semesterCode: body.semesterCode, username, password })
+    return startSync(db, client, { semesterCode: body.semesterCode, username: bodyUsername, password: bodyPassword })
   })
 
   app.post<{

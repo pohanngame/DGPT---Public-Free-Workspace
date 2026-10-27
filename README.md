@@ -42,8 +42,8 @@ flowchart LR
 
 ```bash
 npm install
+# 可选：只有在需要覆盖教务地址时才复制，账号密码不写入任何文件
 cp .env.local.example .env.local
-# 编辑 .env.local，填入自己的教务配置；不要提交该文件
 npm run dev
 # 另开终端启动 API 服务
 npm start
@@ -60,7 +60,7 @@ npm start
 
 ### Docker
 
-Dockerfile 使用 `node:22-slim` 两阶段构建。Compose 映射 `3000:3000`，挂载 `./data:/app/data` 和 `./.env.local:/app/.env.local`，设置 `restart: unless-stopped`，并设置 `mem_limit: 512m`。该值是容器上限，不代表实测常驻内存。
+Dockerfile 使用 `node:22-slim` 两阶段构建。Compose 只把容器端口 `3000` 映射到宿主机回环地址 `127.0.0.1:8089`，仅挂载 `./data:/app/data`，设置 `restart: unless-stopped`、`mem_limit: 512m`、健康检查与日志轮转。该内存值是容器上限，不代表实测常驻内存。需要外网访问时用 `ssh -L 8089:127.0.0.1:8089` 隧道，或在前置反向代理上加访问控制。
 
 ```bash
 docker compose build
@@ -100,4 +100,4 @@ docker compose ps
 | POST | `/api/sync/slider` | 提交滑块轨迹 |
 | GET | `/api/sync/:jobId` | 查询同步进度 |
 
-同步请求中的账号和密码只有在两者都非空时才使用请求值；否则两者一起使用环境变量，避免混用来源。
+同步请求必须同时携带教务账号与密码，二者只在本次请求内使用：密码不入库，服务端也不保存凭据，不会回落到环境变量。缺少任意一项直接返回 422。

@@ -5,8 +5,13 @@ docs
 .memory
 .superpowers
 .git
+.gitignore
+.workbuddy
 data
 dist
 probe
 .playwright-cli
 .env.local
+.jw_cookie_cache.json
+production.log
+production.err

@@ -243,15 +243,15 @@ test('two unselected kbjcmsid options fail the job with KBJCMSID_AMBIGUOUS', asy
   })
 })
 
-test('sync start uses both environment credentials when request omits password', async () => {
+test('sync start rejects a partial credential pair instead of falling back to the environment', async () => {
   const previousUser = process.env.JW_USERNAME
   const previousPassword = process.env.JW_PASSWORD
   process.env.JW_USERNAME = 'env-user'
   process.env.JW_PASSWORD = 'env-password'
-  let received: [string, string] | undefined
+  let logins = 0
   const client: JwClient = {
-    async login(username, password) {
-      received = [username, password]
+    async login() {
+      logins += 1
       return 'OK'
     },
     async submitSlider() { return 'OK' },
@@ -266,8 +266,8 @@ test('sync start uses both environment credentials when request omits password',
         url: '/api/sync/start',
         payload: { semesterCode: SEMESTER, username: 'request-user' },
       })
-      assert.equal(response.statusCode, 200)
-      assert.deepEqual(received, ['env-user', 'env-password'])
+      assert.equal(response.statusCode, 422)
+      assert.equal(logins, 0)
     })
   } finally {
     if (previousUser === undefined) delete process.env.JW_USERNAME
