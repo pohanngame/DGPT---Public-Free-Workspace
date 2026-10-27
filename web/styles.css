@@ -21,3 +21,19 @@
 .sync-success,.sync-failure{display:block;margin:18px 0 0;padding:12px 14px;border-radius:10px;font-size:14px;font-weight:700;text-align:left}
 .sync-success{border:1px solid color-mix(in srgb,var(--green) 45%,var(--border));background:color-mix(in srgb,var(--green) 12%,var(--surface));color:var(--green)}
 .sync-failure{border:1px solid color-mix(in srgb,var(--red) 45%,var(--border));background:color-mix(in srgb,var(--red) 12%,var(--surface));color:var(--red)}
+.undo-notice{border:1px solid color-mix(in srgb,var(--blue) 35%,var(--border));background:color-mix(in srgb,var(--blue) 8%,var(--surface));color:var(--text);gap:8px}
+.undo-notice>button{margin-left:0;background:none;padding:2px 4px;font-size:12px;font-weight:700;color:var(--blue)}
+.undo-notice>.undo-action{margin-left:auto}
+.undo-notice>.undo-close{font-size:16px;line-height:1;color:var(--muted)}
+.undo-notice>button:hover{color:var(--text)}
+.save-preset{display:flex;align-items:center;gap:6px}
+.reset-button{font-weight:700;color:var(--muted)}
+.reset-button:hover{color:var(--red)}
+.preset-name{background:none;padding:0;font-size:12px;font-weight:600;color:inherit}
+.preset-name:hover{text-decoration:underline}
+.preset-chip.confirming{border-color:color-mix(in srgb,var(--red) 55%,var(--border));background:color-mix(in srgb,var(--red) 12%,var(--surface));color:var(--red);cursor:default}
+.preset-confirm-text{font-size:12px;white-space:nowrap}
+.preset-chip.confirming .preset-delete{font-size:12px;line-height:1;font-weight:700;padding:0 2px;color:var(--muted)}
+.preset-chip.confirming .preset-confirm{color:var(--red)}
+.preset-chip.confirming .preset-delete:hover{color:var(--text)}
+.field-hint{color:var(--subtle);font-size:11px;font-weight:400;line-height:1.45}
