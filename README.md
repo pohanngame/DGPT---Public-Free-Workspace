@@ -60,7 +60,9 @@ npm start
 
 ### Docker
 
-Dockerfile 使用 `node:22-slim` 两阶段构建。Compose 只把容器端口 `3000` 映射到宿主机回环地址 `127.0.0.1:8089`，仅挂载 `./data:/app/data`，设置 `restart: unless-stopped`、`mem_limit: 512m`、健康检查与日志轮转。该内存值是容器上限，不代表实测常驻内存。需要外网访问时用 `ssh -L 8089:127.0.0.1:8089` 隧道，或在前置反向代理上加访问控制。
+Dockerfile 使用 `node:22-slim` 两阶段构建。Compose 默认只把容器端口 `3000` 映射到宿主机回环地址 `127.0.0.1:8089`，仅挂载 `./data:/app/data`，设置 `restart: unless-stopped`、`mem_limit: 512m`、健康检查与日志轮转。该内存值是容器上限，不代表实测常驻内存。
+
+映射地址由环境变量控制，默认值写在 compose 内，所以**需要公网访问时不用改 compose**：在项目目录建 `.env` 写 `APP_HOST=0.0.0.0`（端口也可用 `APP_PORT` 覆盖），`git pull` 就不会产生冲突。只在内网使用时，保持默认并走 SSH 隧道：`ssh -L 8089:127.0.0.1:8089 <user>@<server>`。
 
 ```bash
 docker compose build

@@ -2,10 +2,11 @@ services:
   app:
     image: common-free:latest
     build: .
-    # 只监听回环地址：外网不可直接访问，经 SSH 隧道或前置 nginx 暴露。
-    # 若确需公网访问，改成 "8089:3000"，并在前置反向代理上加访问控制（见 README）。
+    # 默认只监听回环地址，外网不可直接访问（SSH 隧道或前置 nginx）。
+    # 需要公网直连时不要改本文件，在服务器上建 .env 写 APP_HOST=0.0.0.0（可加 APP_PORT=8089）即可，
+    # 这样 git pull 不会产生冲突。
     ports:
-      - "127.0.0.1:8089:3000"
+      - "${APP_HOST:-127.0.0.1}:${APP_PORT:-8089}:3000"
     environment:
       HOST: 0.0.0.0
       PORT: 3000

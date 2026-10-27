@@ -11,6 +11,7 @@ data
 dist
 probe
 .playwright-cli
+.env
 .env.local
 .jw_cookie_cache.json
 production.log
