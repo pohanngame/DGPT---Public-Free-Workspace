@@ -16,3 +16,6 @@ production.err
 xu-shu-xitong/
 probe/
 *.tsbuildinfo
+
+# 内部部署与安全核查报告，含服务器信息，不进入公开仓库
+docs/部署与安全核查报告.md

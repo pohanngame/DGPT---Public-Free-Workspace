@@ -10,9 +10,8 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
     volumes:
-      # 首次部署前必须先创建 .env.local，否则 Docker 会把它建成目录，服务读不到凭据
+      # 只挂数据目录：账号密码不落文件，同步时由界面逐次输入
       - ./data:/app/data
-      - ./.env.local:/app/.env.local
     restart: unless-stopped
     # Adjust the memory limit for the target machine as needed.
     mem_limit: 512m
