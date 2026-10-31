@@ -47,3 +47,27 @@ test('occupancy without week text occupies weeks 1 through 30', () => {
   assert.equal(teachers[0]?.cells[0]?.weekEnd, 30)
   assert.equal(teachers[0]?.cells[0]?.occupancyText, '实验课占位')
 })
+
+test('a cell with several course blocks keeps every week range', () => {
+  const html = teacherRow(
+    '万松峰',
+    '工业机器人操作二<br>24级机电1班<br>万松峰<br>(2-6周)<br>6A202<br>' +
+      '工业机器人操作二<br>24级机电1班<br>万松峰<br>(7-10,14周)<br>6A202<br>' +
+      '工业机器人应用实训<br>24级机电2班<br>万松峰<br>(18周)<br>6C4-203<br>' +
+      '工业机器人应用实训<br>24级机电1班<br>万松峰<br>(19周)<br>6C4-203',
+  )
+  const cells = parseTeacherTable(html)[0]?.cells ?? []
+  assert.deepEqual(
+    cells.map((cell) => [cell.weekStart, cell.weekEnd]),
+    [
+      [2, 6],
+      [7, 10],
+      [14, 14],
+      [18, 18],
+      [19, 19],
+    ],
+  )
+  assert.equal(cells[0]?.occupancyText, '工业机器人操作二\n24级机电1班\n万松峰\n(2-6周)')
+  assert.equal(cells[1]?.occupancyText, '工业机器人操作二\n24级机电1班\n万松峰\n(7-10,14周)')
+  assert.ok(cells.at(-1)?.occupancyText.endsWith('(19周)\n6C4-203'))
+})

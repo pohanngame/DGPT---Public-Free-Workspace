@@ -14,6 +14,8 @@ const NOBR_PATTERN = /<nobr[^>]*>(.*?)<\/nobr>/gis
 const WEEK_RANGE_PATTERN = /(\d{1,2})\s*-\s*(\d{1,2})\s*周/
 const WEEK_SINGLE_PATTERN = /(\d{1,2})\s*周/
 const WEEK_LIST_PATTERN = /([0-9,\s]{1,80})\s*周/g
+/** 单个课程块的周次行，写法如 `(2-6周)`、`(7-10,14周)`。 */
+const WEEK_LINE_PATTERN = /\(([0-9][0-9,\s-]*?)\s*周\)?/
 
 export interface ParsedCell {
   dayOfWeek: number
@@ -79,8 +81,9 @@ function parseRow(rowHtml: string, slotCodes: readonly string[]): ParsedTeacherR
     }
     const dayOfWeek = Math.floor((column - 1) / slotCodes.length) + 1
     const slotCode = slotCodes[(column - 1) % slotCodes.length] ?? ''
-    const [weekStart, weekEnd] = extractWeekRange(occupancyText)
-    occupancies.push({ dayOfWeek, slotCode, weekStart, weekEnd, occupancyText })
+    for (const block of extractWeekBlocks(occupancyText)) {
+      occupancies.push({ dayOfWeek, slotCode, ...block })
+    }
   }
   return { name, cells: occupancies }
 }
@@ -94,6 +97,53 @@ function extractTeacherName(nameCellHtml: string): string {
     }
   }
   return toPlainText(nameCellHtml)
+}
+
+/**
+ * 一个格子常塞多个课程块（各自有周次），每块都要单独成行，否则后几块的周次会被丢掉。
+ * 块的固定结构是 课程/班级/教师/周次/教室，共 5 行（实测 6185/6186 的块间距为 5），
+ * 所以下一块从上一块周次的隔一行开始；间距异常时退回逐行，不做猜测。
+ */
+export function extractWeekBlocks(cellText: string): Omit<ParsedCell, 'dayOfWeek' | 'slotCode'>[] {
+  const lines = cellText.split('\n')
+  const tokens = lines.flatMap((line, index) => {
+    const match = WEEK_LINE_PATTERN.exec(line)
+    return match ? [{ index, list: match[1] ?? '' }] : []
+  })
+  if (tokens.length === 0) {
+    const [weekStart, weekEnd] = extractWeekRange(cellText)
+    return [{ weekStart, weekEnd, occupancyText: cellText }]
+  }
+  const blocks: Omit<ParsedCell, 'dayOfWeek' | 'slotCode'>[] = []
+  tokens.forEach((token, position) => {
+    const previous = tokens[position - 1]
+    const from = previous ? (token.index - previous.index === 5 ? previous.index + 2 : previous.index + 1) : 0
+    const segment = lines.slice(from, token.index + 1).join('\n').trim()
+    for (const [weekStart, weekEnd] of weekRuns(token.list)) {
+      blocks.push({ weekStart, weekEnd, occupancyText: segment })
+    }
+  })
+  const tail = lines.slice(tokens[tokens.length - 1]!.index + 1).join('\n').trim()
+  if (tail) {
+    const last = blocks[blocks.length - 1]
+    blocks[blocks.length - 1] = { ...last, occupancyText: `${last.occupancyText}\n${tail}` }
+  }
+  return blocks
+}
+
+/** `7-10,14` 拆成连续区间：7-10 与 14-14，避免把中间的 11-13 周误算成占用。 */
+function weekRuns(list: string): [number, number][] {
+  const runs: [number, number][] = []
+  for (const piece of list.split(',')) {
+    const text = piece.trim()
+    if (/^\d{1,2}$/.test(text)) {
+      runs.push(normalize(Number(text), Number(text)))
+    } else if (/^\d{1,2}\s*-\s*\d{1,2}$/.test(text)) {
+      const [start, end] = text.split('-').map(Number)
+      runs.push(normalize(start, end))
+    }
+  }
+  return runs
 }
 
 /** 原文里的周次范围决定占用周；缺失时按 1-30 全周，避免漏判占用。 */

@@ -68,6 +68,26 @@ test('two present teachers with no Monday 0102 occupancy are FREE', () => {
   })
 })
 
+test('two occupancy rows for the same slot cover their own weeks', () => {
+  withDb((db) => {
+    replaceSemester(db, {
+      semesterCode: SEMESTER,
+      colleges: [COLLEGE],
+      teachers: [
+        teacher('张三', [COLLEGE.code], [
+          { ...busyCell('工业机器人操作二\n(2-6周)'), weekStart: 2, weekEnd: 6 },
+          { ...busyCell('工业机器人操作二\n(7-10周)'), weekStart: 7, weekEnd: 10 },
+        ]),
+      ],
+    })
+    const levelIn = (week: number) =>
+      monday0102(queryCommonFree(db, { semesterCode: SEMESTER, week, teacherNames: ['张三'] }).cells).level
+    assert.equal(levelIn(3), 'ONE_BUSY')
+    assert.equal(levelIn(9), 'ONE_BUSY')
+    assert.equal(levelIn(12), 'FREE')
+  })
+})
+
 test('one of two teachers busy at Monday 0102 is ONE_BUSY', () => {
   withDb((db) => {
     replaceSemester(db, {
