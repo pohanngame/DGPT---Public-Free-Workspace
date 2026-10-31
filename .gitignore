@@ -20,3 +20,8 @@ probe/
 
 # 内部部署与安全核查报告，含服务器信息，不进入公开仓库
 docs/部署与安全核查报告.md
+
+# 交付用的源码包与部署包产物，不进仓库
+common-free-src/
+common-free-deploy/
+*.zip
